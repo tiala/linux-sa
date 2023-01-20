@@ -14,7 +14,9 @@
 #ifdef CONFIG_AMD_MEM_ENCRYPT
 void check_hv_pending(struct pt_regs *regs);
 void check_hv_pending_irq_enable(void);
-void __pi_check_hv_pending_irq_enable(void);
+//void __pi_check_hv_pending_irq_enable(void);
+//void __pi_do_exc_hv(struct pt_regs *regs);
+//void do_exc_hv(struct pt_regs *regs);
 #endif
 
 /* Declaration required for gcc < 4.9 to prevent -Werror=missing-prototypes */
@@ -42,7 +44,7 @@ static __always_inline void native_irq_disable(void)
 	asm volatile("cli": : :"memory");
 }
 
-static __always_inline void native_irq_enable(void)
+static void native_irq_enable(void)
 {
 	asm volatile("sti": : :"memory");
 #ifdef CONFIG_AMD_MEM_ENCRYPT

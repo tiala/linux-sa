@@ -71,6 +71,7 @@ SYM_PIC_ALIAS(boot_svsm_caa_pa);
 
 DEFINE_PER_CPU(struct svsm_ca *, svsm_caa);
 DEFINE_PER_CPU(u64, svsm_caa_pa);
+void sev_snp_setup_hv_doorbell_page(struct ghcb *ghcb);
 
 static inline struct svsm_ca *svsm_get_caa(void)
 {
@@ -135,6 +136,8 @@ static unsigned long snp_tsc_freq_khz __ro_after_init;
 
 DEFINE_PER_CPU(struct sev_es_runtime_data*, runtime_data);
 DEFINE_PER_CPU(struct sev_es_save_area *, sev_vmsa);
+DEFINE_PER_CPU(struct sev_snp_runtime_data*, snp_runtime_data);
+
 
 /*
  * SVSM related information:
@@ -1162,7 +1165,8 @@ void __init snp_set_wakeup_secondary_cpu(void)
 	 * required method to start APs under SNP. If the hypervisor does
 	 * not support AP creation, then no APs will be started.
 	 */
-	apic_update_callback(wakeup_secondary_cpu, wakeup_cpu_via_vmgexit);
+	pr_info("Update  wake up cpu callback\n");	
+	//apic_update_callback(wakeup_secondary_cpu, wakeup_cpu_via_vmgexit);
 }
 
 int __init sev_es_setup_ap_jump_table(struct real_mode_header *rmh)
@@ -1351,6 +1355,7 @@ static void snp_register_per_cpu_ghcb(void)
 	ghcb = &data->ghcb_page;
 
 	snp_register_ghcb_early(__pa(ghcb));
+	sev_snp_setup_hv_doorbell_page(ghcb);
 }
 
 void setup_ghcb(void)
@@ -1479,6 +1484,7 @@ static void __init alloc_runtime_data(int cpu)
 static void __init init_ghcb(int cpu)
 {
 	struct sev_es_runtime_data *data;
+	struct sev_snp_runtime_data *snp_data;
 	int err;
 
 	data = per_cpu(runtime_data, cpu);
@@ -1490,8 +1496,23 @@ static void __init init_ghcb(int cpu)
 
 	memset(&data->ghcb_page, 0, sizeof(data->ghcb_page));
 
+	snp_data = memblock_alloc(sizeof(*snp_data), PAGE_SIZE);
+	if (!snp_data)
+		panic("Can't allocate SEV-SNP runtime data");
+
+	err = early_set_memory_decrypted((unsigned long)&snp_data->hv_doorbell_page,
+					 sizeof(snp_data->hv_doorbell_page));
+	if (err)
+		panic("Can't map #HV doorbell pages unencrypted");
+
+	memset(&snp_data->hv_doorbell_page, 0, sizeof(snp_data->hv_doorbell_page));
+
+	
+	per_cpu(snp_runtime_data, cpu) = snp_data;	
+	
 	data->ghcb_active = false;
 	data->backup_ghcb_active = false;
+	snp_data->hv_handling_events = false;	
 }
 
 void __init sev_es_init_vc_handling(void)

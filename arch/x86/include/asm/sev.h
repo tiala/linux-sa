@@ -84,6 +84,8 @@ extern void vc_no_ghcb(void);
 extern void vc_boot_ghcb(void);
 extern bool handle_vc_boot_ghcb(struct pt_regs *regs);
 
+
+
 /*
  * Individual entries of the SNP CPUID table, as defined by the SNP
  * Firmware ABI, Revision 0.9, Section 7.1, Table 14.

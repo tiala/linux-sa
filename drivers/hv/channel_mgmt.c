@@ -1127,6 +1127,8 @@ static void vmbus_onoffer(struct vmbus_channel_message_header *hdr)
 	}
 
 	oldchannel = find_primary_channel_by_offer(offer);
+	pr_info("vmbus offer changed: relid=%d\n",
+				 offer->child_relid);
 
 	if (oldchannel != NULL) {
 		/*
@@ -1175,7 +1177,7 @@ static void vmbus_onoffer(struct vmbus_channel_message_header *hdr)
 			 * Mellanox VF vmbus device can change when the host
 			 * reoffers the device upon resume.
 			 */
-			pr_debug("vmbus offer changed: relid=%d\n",
+			pr_info("vmbus offer changed: relid=%d\n",
 				 offer->child_relid);
 
 			print_hex_dump_debug("Old vmbus offer: ",

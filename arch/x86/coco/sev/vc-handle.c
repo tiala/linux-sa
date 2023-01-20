@@ -34,6 +34,9 @@
 #include <asm/cpu.h>
 #include <asm/apic.h>
 #include <asm/cpuid/api.h>
+//#include <asm/sev-internal.h>
+
+static bool hv_raw_handle_exception(struct pt_regs *regs);
 
 static enum es_result vc_slow_virt_to_phys(struct ghcb *ghcb, struct es_em_ctxt *ctxt,
 					   unsigned long vaddr, phys_addr_t *paddr)
@@ -1032,11 +1035,6 @@ DEFINE_IDTENTRY_VC_USER(exc_vmm_communication)
 	irqentry_exit_to_user_mode(regs);
 }
 
-static bool hv_raw_handle_exception(struct pt_regs *regs)
-{
-	return false;
-}
-
 static __always_inline bool on_hv_fallback_stack(struct pt_regs *regs)
 {
 	unsigned long sp = (unsigned long)regs;
@@ -1132,3 +1130,232 @@ fail:
 	sev_es_terminate(SEV_TERM_SET_GEN, GHCB_SEV_ES_GEN_REQ);
 }
 
+void do_exc_hv(struct pt_regs *regs);
+
+struct sev_hv_doorbell_page *sev_snp_current_doorbell_page(void)
+{
+	return &this_cpu_read(snp_runtime_data)->hv_doorbell_page;
+}
+
+static bool hv_raw_handle_exception(struct pt_regs *regs)
+{
+        /* Clear the no_further_signal bit */
+	sev_snp_current_doorbell_page()->pending_events.events &= 0x7fff;
+	
+	check_hv_pending(regs);	
+	return true;
+}
+
+
+static u8 sev_hv_pending(void)
+{
+	return sev_snp_current_doorbell_page()->pending_events.events;
+}
+
+#define sev_hv_pending_nmi	\
+		sev_snp_current_doorbell_page()->pending_events.nmi
+
+int vmgexit_hv_doorbell_page(struct ghcb *ghcb, u64 op, u64 pa)
+{
+	return sev_es_ghcb_hv_call(ghcb, NULL, SVM_VMGEXIT_HV_DOORBELL_PAGE, op, pa);
+}
+
+void check_hv_pending_irq_enable(void)
+{
+	struct pt_regs regs;
+
+	//if (!cc_platform_has(CC_ATTR_GUEST_SEV_SNP))
+	//	return;
+
+	memset(&regs, 0, sizeof(struct pt_regs));
+	asm volatile("movl %%cs, %%eax;" : "=a" (regs.cs));
+	asm volatile("movl %%ss, %%eax;" : "=a" (regs.ss));
+	regs.orig_ax = 0xffffffff;
+	regs.flags = native_save_fl();
+
+	/*
+	 * Disable irq when handle pending #HV events after
+	 * re-enabling irq.
+	 */
+	asm volatile("cli" : : : "memory");
+	do_exc_hv(&regs);
+	asm volatile("sti" : : : "memory");
+}
+
+static bool sev_restricted_injection_enabled(void)
+{
+	return sev_status & MSR_AMD64_SNP_RESTRICTED_INJ;
+}
+
+static void hv_doorbell_apic_eoi_write(void)
+{
+	if (xchg(&sev_snp_current_doorbell_page()->no_eoi_required, 0) & 0x1)
+		return;
+
+	//BUG_ON(reg != APIC_EOI);
+	//wrmsrq(HV_X64_MSR_EOI, APIC_EOI_ACK);	
+	apic->write(APIC_EOI, APIC_EOI_ACK);
+}
+
+void __init sev_snp_init_hv_handling(void)
+{
+	struct sev_es_runtime_data *data;
+	struct ghcb_state state;
+	struct ghcb *ghcb;
+	unsigned long flags;
+
+	WARN_ON(!irqs_disabled());
+	if (!cc_platform_has(CC_ATTR_GUEST_SEV_SNP) || !sev_restricted_injection_enabled())
+		return;
+
+	data = this_cpu_read(runtime_data);
+
+	local_irq_save(flags);
+
+	ghcb = __sev_get_ghcb(&state);
+
+	__sev_put_ghcb(&state);
+
+	apic_update_callback(eoi, hv_doorbell_apic_eoi_write);
+	local_irq_restore(flags);
+
+	//construct_sysvec_table();
+}
+
+noinstr void irqentry_exit_hv_cond(struct pt_regs *regs, irqentry_state_t state)
+{
+	/*
+	 * Check whether this returns to user mode, if so and if
+	 * we are currently executing the #HV handler then we don't
+	 * want to follow the irqentry_exit_to_user_mode path as
+	 * that can potentially cause the #HV handler to be
+	 * preempted and rescheduled on another CPU. Rescheduled #HV
+	 * handler on another cpu will cause interrupts to be handled
+	 * on a different cpu than the injected one, causing
+	 * invalid EOIs and missed/lost guest interrupts and
+	 * corresponding hangs and/or per-cpu IRQs handled on
+	 * non-intended cpu.
+	 */
+	if (user_mode(regs) &&
+	    this_cpu_read(snp_runtime_data)->hv_handling_events)
+		return;
+
+	/* follow normal interrupt return/exit path */
+	irqentry_exit(regs, state);
+}
+
+asmlinkage void check_hv_pending(struct pt_regs *regs)
+{
+	//if (!cc_platform_has(CC_ATTR_GUEST_SEV_SNP))
+	//	return;
+
+	if ((regs->flags & X86_EFLAGS_IF) == 0)
+		return;
+	do_exc_hv(regs);
+}
+
+void sev_snp_setup_hv_doorbell_page(struct ghcb *ghcb)
+{
+	u64 pa;
+	enum es_result ret;
+
+	pa = __pa(sev_snp_current_doorbell_page());
+	vc_ghcb_invalidate(ghcb);
+	ret = vmgexit_hv_doorbell_page(ghcb,
+				       SVM_VMGEXIT_SET_HV_DOORBELL_PAGE,
+				       pa);
+	if (ret != ES_OK)
+		panic("SEV-SNP: failed to set up #HV doorbell page");
+}
+
+void do_exc_hv(struct pt_regs *regs)
+{
+	union hv_pending_events pending_events;
+
+	
+	/* Avoid nested entry. */
+	if (this_cpu_read(snp_runtime_data)->hv_handling_events)
+		return;
+
+	this_cpu_read(snp_runtime_data)->hv_handling_events = true;
+
+	while (sev_hv_pending()) {
+		pending_events.events = xchg(
+			&sev_snp_current_doorbell_page()->pending_events.events,
+			0);
+
+		pr_info("%s %d vector %x.\n", __func__, __LINE__, pending_events.vector);
+		if (pending_events.nmi)
+			exc_nmi(regs);
+
+#ifdef CONFIG_X86_MCE
+		if (pending_events.mc)
+			exc_machine_check(regs);
+#endif
+
+		if (!pending_events.vector)
+			goto out;
+
+		pr_info("%s %d\n", __func__, __LINE__);
+		if (pending_events.vector < FIRST_EXTERNAL_VECTOR) {
+			/* Exception vectors */
+			WARN(1, "exception shouldn't happen\n");
+		} else if (pending_events.vector == FIRST_EXTERNAL_VECTOR) {
+			//sysvec_irq_move_cleanup(regs);
+		} else if (pending_events.vector == IA32_SYSCALL_VECTOR) {
+			WARN(1, "syscall shouldn't happen\n");
+		} else if (pending_events.vector >= FIRST_SYSTEM_VECTOR) {
+			switch (pending_events.vector) {
+#if IS_ENABLED(CONFIG_HYPERV)
+			case HYPERV_STIMER0_VECTOR:
+				sysvec_hyperv_stimer0(regs);
+				break;
+			case HYPERVISOR_CALLBACK_VECTOR:
+				sysvec_hyperv_callback(regs);
+				break;
+#endif
+#ifdef CONFIG_SMP
+			case RESCHEDULE_VECTOR:
+				sysvec_reschedule_ipi(regs);
+				break;
+				//case IRQ_MOVE_CLEANUP_VECTOR:
+				//sysvec_irq_move_cleanup(regs);
+				//break;
+			case REBOOT_VECTOR:
+				sysvec_reboot(regs);
+				break;
+			case CALL_FUNCTION_SINGLE_VECTOR:
+				sysvec_call_function_single(regs);
+				break;
+			case CALL_FUNCTION_VECTOR:
+				sysvec_call_function(regs);
+				break;
+#endif
+#ifdef CONFIG_X86_LOCAL_APIC
+			case ERROR_APIC_VECTOR:
+				sysvec_error_interrupt(regs);
+				break;
+			case SPURIOUS_APIC_VECTOR:
+				sysvec_spurious_apic_interrupt(regs);
+				break;
+			case LOCAL_TIMER_VECTOR:
+				sysvec_apic_timer_interrupt(regs);
+				break;
+			case X86_PLATFORM_IPI_VECTOR:
+				sysvec_x86_platform_ipi(regs);
+				break;
+#endif
+			case 0x0:
+				break;
+			default:
+				//panic("Unexpected vector %d\n", vector);
+				unreachable();
+			}
+		} else {
+			common_interrupt(regs, pending_events.vector);
+		}
+	}
+
+out:
+	this_cpu_read(snp_runtime_data)->hv_handling_events = false;
+}

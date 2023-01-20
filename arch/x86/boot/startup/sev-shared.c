@@ -611,7 +611,7 @@ static void svsm_pval_4k_page(unsigned long paddr, bool validate,
 	 * This can be called very early in the boot, use native functions in
 	 * order to avoid paravirt issues.
 	 */
-	flags = native_local_irq_save();
+	//flags = native_local_irq_save();
 
 	call.caa = caa;
 
@@ -638,7 +638,7 @@ static void svsm_pval_4k_page(unsigned long paddr, bool validate,
 	if (svsm_call_msr_protocol(&call))
 		sev_es_terminate(SEV_TERM_SET_LINUX, GHCB_TERM_PVALIDATE);
 
-	native_local_irq_restore(flags);
+	//native_local_irq_restore(flags);
 }
 
 static void pvalidate_4k_page(unsigned long vaddr, unsigned long paddr,
@@ -765,42 +765,4 @@ static bool __init svsm_setup_ca(const struct cc_blob_sev_info *cc_info,
 	}
 
 	return true;
-}
-
-static void do_exc_hv(struct pt_regs *regs)
-{
-	/* Handle #HV exception. */
-}
-
-asmlinkage void check_hv_pending(struct pt_regs *regs)
-{
-	//if (!cc_platform_has(CC_ATTR_GUEST_SEV_SNP))
-	//	return;
-
-	if ((regs->flags & X86_EFLAGS_IF) == 0)
-		return;
-
-	do_exc_hv(regs);
-}
-
-void check_hv_pending_irq_enable(void)
-{
-	struct pt_regs regs;
-
-	//if (!cc_platform_has(CC_ATTR_GUEST_SEV_SNP))
-	//	return;
-
-	memset(&regs, 0, sizeof(struct pt_regs));
-	asm volatile("movl %%cs, %%eax;" : "=a" (regs.cs));
-	asm volatile("movl %%ss, %%eax;" : "=a" (regs.ss));
-	regs.orig_ax = 0xffffffff;
-	regs.flags = native_save_fl();
-
-	/*
-	 * Disable irq when handle pending #HV events after
-	 * re-enabling irq.
-	 */
-	asm volatile("cli" : : : "memory");
-	do_exc_hv(&regs);
-	asm volatile("sti" : : : "memory");
 }

@@ -12,5 +12,7 @@ PROVIDE(snp_cpuid			= __pi_snp_cpuid);
 PROVIDE(snp_cpuid_get_table		= __pi_snp_cpuid_get_table);
 PROVIDE(svsm_issue_call			= __pi_svsm_issue_call);
 PROVIDE(svsm_process_result_codes	= __pi_svsm_process_result_codes);
-PROVIDE(check_hv_pending_irq_enable     = __pi_check_hv_pending_irq_enable);
-PROVIDE(check_hv_pending		= __pi_check_hv_pending);
+//PROVIDE(check_hv_pending_irq_enable     = __pi_check_hv_pending_irq_enable);
+//PROVIDE(check_hv_pending		= __pi_check_hv_pending);
+//PROVIDE(do_hv_exc			= __pi_do_hv_exc);
+

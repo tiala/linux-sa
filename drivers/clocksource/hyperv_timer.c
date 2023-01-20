@@ -275,6 +275,7 @@ int hv_stimer_alloc(bool have_percpu_irqs)
 	if (!hv_clock_event)
 		return -ENOMEM;
 
+	pr_info("%s %d.\n", __func__, __LINE__);
 	direct_mode_enabled = ms_hyperv.misc_features &
 			HV_STIMER_DIRECT_MODE_AVAILABLE;
 
@@ -282,7 +283,7 @@ int hv_stimer_alloc(bool have_percpu_irqs)
 	 * If Direct Mode isn't enabled, the remainder of the initialization
 	 * is done later by hv_stimer_legacy_init()
 	 */
-	if (!direct_mode_enabled)
+	//if (!direct_mode_enabled)
 		return 0;
 
 	if (have_percpu_irqs) {

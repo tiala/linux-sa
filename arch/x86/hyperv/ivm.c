@@ -310,6 +310,8 @@ int hv_snp_boot_ap(u32 apic_id, unsigned long start_ip, unsigned int cpu)
 	if (!vmsa)
 		return -ENOMEM;
 
+	pr_info("%s %d.\n", __func__, __LINE__);
+	
 #ifdef CONFIG_HYPERV_VTL_MODE
 	int i;
 
@@ -330,6 +332,7 @@ int hv_snp_boot_ap(u32 apic_id, unsigned long start_ip, unsigned int cpu)
 #endif
 
 	native_store_gdt(&gdtr);
+	pr_info("%s %d.\n", __func__, __LINE__);	
 
 	vmsa->gdtr.base = gdtr.address;
 	vmsa->gdtr.limit = gdtr.size;
@@ -356,7 +359,8 @@ int hv_snp_boot_ap(u32 apic_id, unsigned long start_ip, unsigned int cpu)
 	vmsa->g_pat = HV_AP_INIT_GPAT_DEFAULT;
 	vmsa->rip = (u64)secondary_startup_64_no_verify;
 	vmsa->rsp = (u64)&ap_start_stack[PAGE_SIZE];
-
+	pr_info("%s %d.\n", __func__, __LINE__);
+	
 	/*
 	 * Set the SNP-specific fields for this VMSA:
 	 *   VMPL level
@@ -394,6 +398,8 @@ int hv_snp_boot_ap(u32 apic_id, unsigned long start_ip, unsigned int cpu)
 	}
 #endif
 
+	pr_info("%s %d.\n", __func__, __LINE__);
+	
 	do {
 		ret = hv_do_hypercall(HVCALL_START_VP,
 				      start_vp_input, NULL);
@@ -407,6 +413,8 @@ int hv_snp_boot_ap(u32 apic_id, unsigned long start_ip, unsigned int cpu)
 		vmsa = NULL;
 	}
 
+	pr_info("%s %d.\n", __func__, __LINE__);
+	
 	cur_vmsa = per_cpu(hv_sev_vmsa, cpu_id);
 	/* Free up any previous VMSA page */
 	if (cur_vmsa)

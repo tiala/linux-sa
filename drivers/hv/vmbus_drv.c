@@ -1098,6 +1098,7 @@ void vmbus_on_msg_dpc(unsigned long data)
 
 	entry = &channel_message_table[msgtype];
 
+	pr_info("msgtype=%d len=%d\n", msgtype, payload_size);
 	if (!entry->message_handler)
 		goto msg_handled;
 
@@ -1320,6 +1321,8 @@ void vmbus_isr(void)
 	page_addr = hv_cpu->synic_message_page;
 	msg = (struct hv_message *)page_addr + VMBUS_MESSAGE_SINT;
 
+	pr_info("%s msg %d.\n", __func__, __LINE__, msg->header.message_type);
+	
 	/* Check if there are actual msgs to be processed */
 	if (msg->header.message_type != HVMSG_NONE) {
 		if (msg->header.message_type == HVMSG_TIMER_EXPIRED) {

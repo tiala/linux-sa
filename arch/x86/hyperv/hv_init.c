@@ -34,6 +34,7 @@
 #include <clocksource/hyperv_timer.h>
 #include <linux/highmem.h>
 #include <linux/export.h>
+#include <asm/idtentry.h>
 
 void *hv_hypercall_pg;
 
@@ -351,15 +352,17 @@ static void __init hv_stimer_setup_percpu_clockev(void)
 	 * Ignore any errors in setting up stimer clockevents
 	 * as we can run with the LAPIC timer as a fallback.
 	 */
+	pr_info("%s %d.\n", __func__, __LINE__);
 	(void)hv_stimer_alloc(false);
-
+	pr_info("%s %d.\n", __func__, __LINE__);
+	
 	/*
 	 * Still register the LAPIC timer, because the direct-mode STIMER is
 	 * not supported by old versions of Hyper-V. This also allows users
 	 * to switch to LAPIC timer via /sys, if they want to.
 	 */
-	if (old_setup_percpu_clockev)
-		old_setup_percpu_clockev();
+//	if (old_setup_percpu_clockev)
+//		old_setup_percpu_clockev();
 }
 
 /*

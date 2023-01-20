@@ -542,6 +542,32 @@ struct vmcb {
 	};
 } __packed;
 
+union hv_pending_events {
+	u16 events;
+	struct {
+		u8 vector;
+		u8 nmi : 1;
+		u8 mc : 1;
+		u8 reserved1 : 5;
+		u8 no_further_signal : 1;
+	};
+};
+
+struct sev_hv_doorbell_page {
+	union hv_pending_events pending_events;
+	u8 no_eoi_required;
+	u8 reserved2[61];
+	u8 padding[4032];
+};
+
+struct sev_snp_runtime_data {
+	struct sev_hv_doorbell_page hv_doorbell_page;
+	/*
+	 * Indication that we are currently handling #HV events.
+	 */
+	bool hv_handling_events;
+};
+
 #define EXPECTED_VMCB_SAVE_AREA_SIZE		744
 #define EXPECTED_GHCB_SAVE_AREA_SIZE		1032
 #define EXPECTED_SEV_ES_SAVE_AREA_SIZE		1648

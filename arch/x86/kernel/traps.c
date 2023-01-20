@@ -78,6 +78,7 @@
 #endif
 
 #include <asm/proto.h>
+#include <asm/mem_encrypt.h>
 
 DECLARE_BITMAP(system_vectors, NR_VECTORS);
 
@@ -1630,6 +1631,8 @@ void __init trap_init(void)
 	/* Setup traps as cpu_init() might #GP */
 	if (!cpu_feature_enabled(X86_FEATURE_FRED))
 		idt_setup_traps();
+
+	sev_snp_init_hv_handling();
 
 	cpu_init();
 }

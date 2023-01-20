@@ -53,6 +53,8 @@ void __sev_put_ghcb(struct ghcb_state *state);
 
 DECLARE_PER_CPU(struct sev_es_runtime_data*, runtime_data);
 DECLARE_PER_CPU(struct sev_es_save_area *, sev_vmsa);
+DECLARE_PER_CPU(struct sev_snp_runtime_data*, snp_runtime_data);
+
 
 void early_set_pages_state(unsigned long vaddr, unsigned long paddr,
 			   unsigned long npages, const struct psc_desc *desc);
