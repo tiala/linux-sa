@@ -27,6 +27,7 @@ union hv_ghcb;
 DECLARE_STATIC_KEY_FALSE(isolation_type_snp);
 DECLARE_STATIC_KEY_FALSE(isolation_type_tdx);
 
+
 typedef int (*hyperv_fill_flush_list_func)(
 		struct hv_guest_mapping_flush_list *flush,
 		void *data);
@@ -44,6 +45,9 @@ extern u64 hv_std_hypercall(u64 control, u64 param1, u64 param2);
 
 #if IS_ENABLED(CONFIG_HYPERV)
 extern void *hv_hypercall_pg;
+
+
+extern bool hv_isolation_type_en_snp(void);
 
 extern union hv_ghcb * __percpu *hv_ghcb_pg;
 
