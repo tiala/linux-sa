@@ -64,6 +64,20 @@ DECLARE_STATIC_CALL(hv_hypercall, hv_std_hypercall);
  */
 #define HV_AP_INIT_GPAT_DEFAULT		0x0007040600070406ULL
 #define HV_AP_SEGMENT_LIMIT		0xffffffff
+/*
+ * Hyper-V puts processor and memory layout info
+ * to this address in SEV-SNP enlightened guest.
+ */
+#define EN_SEV_SNP_PROCESSOR_INFO_ADDR  0x802000
+#define EN_SEV_SNP_MEM_INFO_ADDR	0x802018
+
+struct memory_map_entry {
+	u64 starting_gpn;
+	u64 numpages;
+	u16 type;
+	u16 flags;
+	u32 reserved;
+};
 
 /*
  * If the hypercall involves no input or output parameters, the hypervisor
@@ -200,12 +214,14 @@ int hv_unmap_ioapic_interrupt(int ioapic_id, struct hv_interrupt_entry *entry);
 #ifdef CONFIG_AMD_MEM_ENCRYPT
 bool hv_ghcb_negotiate_protocol(void);
 void __noreturn hv_ghcb_terminate(unsigned int set, unsigned int reason);
+
 int hv_snp_boot_ap(u32 apic_id, unsigned long start_ip, unsigned int cpu);
+void hv_sev_init_mem_and_cpu(void);
 #else
 static inline bool hv_ghcb_negotiate_protocol(void) { return false; }
 static inline void hv_ghcb_terminate(unsigned int set, unsigned int reason) {}
-static inline int hv_snp_boot_ap(u32 apic_id, unsigned long start_ip,
-		unsigned int cpu) { return 0; }
+static inline int hv_snp_boot_ap(int cpu, unsigned long start_ip) { return 0; }
+static inline void hv_sev_init_mem_and_cpu(void) {}
 #endif
 
 #if defined(CONFIG_AMD_MEM_ENCRYPT) || defined(CONFIG_INTEL_TDX_GUEST)
