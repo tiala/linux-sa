@@ -766,3 +766,41 @@ static bool __init svsm_setup_ca(const struct cc_blob_sev_info *cc_info,
 
 	return true;
 }
+
+static void do_exc_hv(struct pt_regs *regs)
+{
+	/* Handle #HV exception. */
+}
+
+asmlinkage void check_hv_pending(struct pt_regs *regs)
+{
+	//if (!cc_platform_has(CC_ATTR_GUEST_SEV_SNP))
+	//	return;
+
+	if ((regs->flags & X86_EFLAGS_IF) == 0)
+		return;
+
+	do_exc_hv(regs);
+}
+
+void check_hv_pending_irq_enable(void)
+{
+	struct pt_regs regs;
+
+	//if (!cc_platform_has(CC_ATTR_GUEST_SEV_SNP))
+	//	return;
+
+	memset(&regs, 0, sizeof(struct pt_regs));
+	asm volatile("movl %%cs, %%eax;" : "=a" (regs.cs));
+	asm volatile("movl %%ss, %%eax;" : "=a" (regs.ss));
+	regs.orig_ax = 0xffffffff;
+	regs.flags = native_save_fl();
+
+	/*
+	 * Disable irq when handle pending #HV events after
+	 * re-enabling irq.
+	 */
+	asm volatile("cli" : : : "memory");
+	do_exc_hv(&regs);
+	asm volatile("sti" : : : "memory");
+}
