@@ -1811,7 +1811,7 @@ static long mshv_vtl_ioctl_read_vmx_cr4_fixed1(void __user *user_arg)
 
 static void __noreturn mshv_sev_es_terminate(unsigned int set, unsigned int reason)
 {
-	native_wrmsrl(MSR_AMD64_SEV_ES_GHCB,
+	native_wrmsrq(MSR_AMD64_SEV_ES_GHCB,
 		      GHCB_SEV_TERM_REASON(set, reason) | GHCB_MSR_TERM_REQ);
 	VMGEXIT();
 
