@@ -124,18 +124,6 @@ int hv_sev_printf(const char *fmt, va_list ap)
 	return len;
 }
 
-void hv_sev_debugbreak(u32 val)
-{
-	u32 low, high;
-	val = ((val & (u32)0xf) << 12) | (u32)0xf03;
-	asm volatile ("rdmsr" : "=a" (low), "=d" (high) : "c" (0xc0010130));
-	asm volatile ("wrmsr\n\r"
-		      "rep; vmmcall\n\r"
-		      :: "c" (0xc0010130), "a" (val), "d" (0x0));
-	asm volatile ("wrmsr" :: "c" (0xc0010130), "a" (low), "d" (high));
-}
-EXPORT_SYMBOL_GPL(hv_sev_debugbreak);
-
 asmlinkage int vprintk(const char *fmt, va_list args)
 {
 	va_list args2;
