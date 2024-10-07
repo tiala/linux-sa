@@ -594,6 +594,8 @@ SYM_CODE_END(\asmsym)
 SYM_CODE_START(\asmsym)
 	UNWIND_HINT_IRET_REGS
 	ASM_CLAC
+	cld
+
 	pushq	$-1			/* ORIG_RAX: no syscall to restart */
 
 	testb	$3, CS-ORIG_RAX(%rsp)
@@ -622,7 +624,7 @@ SYM_CODE_START(\asmsym)
 	jmp	paranoid_exit
 
 .Lfrom_usermode_switch_stack_\@:
-	idtentry_body user_\cfunc, has_error_code=1
+	idtentry_body user_\cfunc, has_error_code=0
 
 _ASM_NOKPROBE(\asmsym)
 SYM_CODE_END(\asmsym)
