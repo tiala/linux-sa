@@ -14,6 +14,15 @@
 
 static DEFINE_PER_CPU(int, printk_context);
 
+static bool sev_printf = false;
+
+int __init enable_sev_printf(char *str)
+{
+	sev_printf = true;
+	return 0;
+}
+__setup("sev_printf", enable_sev_printf);
+
 /* Can be preempted by NMI. */
 void __printk_safe_enter(void)
 {
@@ -135,12 +144,11 @@ asmlinkage int vprintk(const char *fmt, va_list args)
 		return vkdb_printf(KDB_MSGSRC_PRINTK, fmt, args);
 #endif
 
-	//if (sev_snp_active())
-
-	va_copy(args2, args);
-	hv_sev_printf(fmt, args2);
-	va_end(args2);
-
+	if (sev_printf) {
+		va_copy(args2, args);
+		hv_sev_printf(fmt, args2);
+		va_end(args2);
+	}
 	/*
 	 * Use the main logbuf even in NMI. But avoid calling console
 	 * drivers that might have their own locks.
