@@ -219,6 +219,7 @@ static void do_exc_hv(struct pt_regs *regs)
 {
 	union hv_pending_events pending_events;
 
+	printk_once("receive #HV exception!!!--------------.\n");
 	/* Avoid nested entry. */
 	if (this_cpu_read(snp_runtime_data)->hv_handling_events)
 		return;
