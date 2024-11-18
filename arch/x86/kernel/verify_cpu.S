@@ -35,6 +35,8 @@
 #define SSE_MASK	\
 	(REQUIRED_MASK0 & ((1<<(X86_FEATURE_XMM & 31)) | (1<<(X86_FEATURE_XMM2 & 31))))
 
+#define REQUIRED_MASK0	0x07008169U	
+
 SYM_FUNC_START_LOCAL(verify_cpu)
 	pushf				# Save caller passed flags
 	push	$0			# Kill any dangerous flags
