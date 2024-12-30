@@ -507,7 +507,7 @@ asmlinkage __visible void *extract_kernel(void *rmode, unsigned char *output)
 	debug_putstr(").\n");
 
 	/* Disable exception handling before booting the kernel */
-	cleanup_exception_handling();
+	cleanup_exception_handling(boot_params);
 
 	return output + entry_offset;
 }

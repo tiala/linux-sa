@@ -136,7 +136,7 @@ static inline void console_init(void)
 #ifdef CONFIG_AMD_MEM_ENCRYPT
 void sev_enable(struct boot_params *bp);
 void snp_check_features(void);
-void sev_es_shutdown_ghcb(void);
+void sev_es_shutdown_ghcb(struct boot_params *bp);
 extern bool sev_es_check_ghcb_fault(unsigned long address);
 void snp_set_page_private(unsigned long paddr);
 void snp_set_page_shared(unsigned long paddr);
@@ -154,7 +154,7 @@ static inline void sev_enable(struct boot_params *bp)
 		bp->cc_blob_address = 0;
 }
 static inline void snp_check_features(void) { }
-static inline void sev_es_shutdown_ghcb(void) { }
+static inline void sev_es_shutdown_ghcb(struct boot_params *boot_params) { }
 static inline bool sev_es_check_ghcb_fault(unsigned long address)
 {
 	return false;
@@ -190,9 +190,9 @@ extern gate_desc boot_idt[BOOT_IDT_ENTRIES];
 extern struct desc_ptr boot_idt_desc;
 
 #ifdef CONFIG_X86_64
-void cleanup_exception_handling(void);
+void cleanup_exception_handling(struct boot_params *boot_params);
 #else
-static inline void cleanup_exception_handling(void) { }
+static inline void cleanup_exception_handling(struct boot_params *boot_params) { }
 #endif
 
 /* IDT Entry Points */

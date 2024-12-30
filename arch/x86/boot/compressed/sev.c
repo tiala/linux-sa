@@ -316,8 +316,17 @@ void snp_accept_memory(phys_addr_t start, phys_addr_t end)
 		pa = __snp_accept_memory(&desc, pa, end);
 }
 
-void sev_es_shutdown_ghcb(void)
+void sev_es_shutdown_ghcb(struct boot_params *boot_params)
 {
+	struct boot_e820_entry *e820_entry;
+
+	e820_entry = &boot_params->e820_table[boot_params->e820_entries];
+	e820_entry->addr = __pa(boot_ghcb);
+	e820_entry->size = PAGE_SIZE;
+	e820_entry->type = E820_TYPE_RESERVED;
+	boot_params->e820_entries++;
+	return;
+	
 	if (!boot_ghcb)
 		return;
 

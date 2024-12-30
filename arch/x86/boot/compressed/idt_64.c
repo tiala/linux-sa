@@ -77,13 +77,13 @@ void load_stage2_idt(void)
 	load_boot_idt(&boot_idt_desc);
 }
 
-void cleanup_exception_handling(void)
+void cleanup_exception_handling(struct boot_params *boot_params)
 {
 	/*
 	 * Flush GHCB from cache and map it encrypted again when running as
 	 * SEV-ES guest.
 	 */
-	//sev_es_shutdown_ghcb();
+	sev_es_shutdown_ghcb(boot_params);
 
 	/* Set a null-idt, disabling #PF and #VC handling */
 	boot_idt_desc.size    = 0;
