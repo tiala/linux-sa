@@ -213,8 +213,6 @@ static void do_exc_hv(struct pt_regs *regs)
 	this_cpu_read(snp_runtime_data)->hv_handling_events = true;
 
 	while (sev_hv_pending()) {
-		asm volatile("cli" : : : "memory");
-
 		pending_events.events = xchg(
 			&sev_snp_current_doorbell_page()->pending_events.events,
 			0);
@@ -223,14 +221,14 @@ static void do_exc_hv(struct pt_regs *regs)
 			exc_nmi(regs);
 
 #ifdef CONFIG_X86_MCE
-		if (pending_events.mc)
+		if (pending_events.mc) {
 			exc_machine_check(regs);
-#endif
-
-		if (!pending_events.vector) {
-			asm volatile("sti" : : : "memory");
 			break;
 		}
+#endif
+
+		if (!pending_events.vector)
+			break;
 
 		if (pending_events.vector < FIRST_EXTERNAL_VECTOR) {
 			/* Exception vectors */
@@ -249,8 +247,6 @@ static void do_exc_hv(struct pt_regs *regs)
 		} else {
 			common_interrupt(regs, pending_events.vector);
 		}
-
-		asm volatile("sti" : : : "memory");
 	}
 
 	this_cpu_read(snp_runtime_data)->hv_handling_events = false;
@@ -267,11 +263,13 @@ void check_hv_pending(struct pt_regs *regs)
 		if ((regs->flags & X86_EFLAGS_IF) == 0)
 			return;
 
-		if (!sev_hv_pending())
-			return;
-
-		do_exc_hv(regs);
+		asm volatile("cli" : : : "memory");
+		if (sev_hv_pending())
+			do_exc_hv(regs);
+		asm volatile("sti" : : : "memory");
 	} else {
+
+		asm volatile("cli" : : : "memory");
 		if (sev_hv_pending()) {
 			memset(&local_regs, 0, sizeof(struct pt_regs));
 			regs = &local_regs;
@@ -281,9 +279,9 @@ void check_hv_pending(struct pt_regs *regs)
 			regs->flags = native_save_fl();
 			do_exc_hv(regs);
 		}
+		asm volatile("sti" : : : "memory");
 	}
 }
-EXPORT_SYMBOL_GPL(check_hv_pending);
 
 static __always_inline bool on_vc_stack(struct pt_regs *regs)
 {
@@ -2255,9 +2253,7 @@ DEFINE_IDTENTRY_VC_USER(exc_vmm_communication)
 
 static bool hv_raw_handle_exception(struct pt_regs *regs)
 {
-	/* Clear the no_further_signal bit */
-	sev_snp_current_doorbell_page()->pending_events.events &= 0x7fff;
-
+	sev_snp_current_doorbell_page()->pending_events.no_further_signal = 0;
 	check_hv_pending(regs);
 
 	return true;
