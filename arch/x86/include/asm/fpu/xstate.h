@@ -49,10 +49,14 @@
 /* Supervisor features which are enabled only in guest FPUs */
 #define XFEATURE_MASK_GUEST_SUPERVISOR	XFEATURE_MASK_CET_KERNEL
 
+#ifdef CONFIG_X86_USER_SHADOW_STACK
 /* All currently supported supervisor features */
 #define XFEATURE_MASK_SUPERVISOR_SUPPORTED (XFEATURE_MASK_PASID | \
 					    XFEATURE_MASK_CET_USER | \
 					    XFEATURE_MASK_GUEST_SUPERVISOR)
+#else
+#define XFEATURE_MASK_SUPERVISOR_SUPPORTED XFEATURE_MASK_PASID
+#endif
 
 /*
  * A supervisor state component may not always contain valuable information,
