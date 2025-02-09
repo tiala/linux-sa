@@ -136,6 +136,7 @@ static void sev_snp_setup_hv_doorbell_page(struct ghcb *ghcb);
 
 union hv_pending_events {
 	u16 events;
+	u8 bytes[2];
 	struct {
 		u8 vector;
 		u8 nmi : 1;
@@ -254,32 +255,77 @@ static void do_exc_hv(struct pt_regs *regs)
 
 void check_hv_pending(struct pt_regs *regs)
 {
+	struct sev_snp_runtime_data *snp_data
+		= this_cpu_read(snp_runtime_data);
+	union hv_pending_events pending_events, *db_pending_events;
 	struct pt_regs local_regs;
 
 	if (!cc_platform_has(CC_ATTR_GUEST_SEV_SNP))
 		return;
 
+	/*
+	 * Avoid re-entry cases after do_exc_hv() enter
+	 * into the loop of handling pending events.
+	 */
+	if (snp_data->hv_handling_events)
+		return;
+
 	if (regs) {
-		if ((regs->flags & X86_EFLAGS_IF) == 0)
+		if ((regs->flags & X86_EFLAGS_IF) == 0) {
+			db_pending_events =
+				&sev_snp_current_doorbell_page()->pending_events;
+			pending_events.bytes[1] =
+				xchg(&db_pending_events->bytes[1], 0);
+
+			if (pending_events.nmi)
+				exc_nmi(regs);
+
+#ifdef CONFIG_X86_MCE
+			if (pending_events.mc)
+				exc_machine_check(regs);
+#endif
 			return;
-
-		asm volatile("cli" : : : "memory");
-		if (sev_hv_pending())
-			do_exc_hv(regs);
-		asm volatile("sti" : : : "memory");
-	} else {
-
-		asm volatile("cli" : : : "memory");
-		if (sev_hv_pending()) {
-			memset(&local_regs, 0, sizeof(struct pt_regs));
-			regs = &local_regs;
-			asm volatile("movl %%cs, %%eax;" : "=a" (regs->cs));
-			asm volatile("movl %%ss, %%eax;" : "=a" (regs->ss));
-			regs->orig_ax = 0xffffffff;
-			regs->flags = native_save_fl();
-			do_exc_hv(regs);
 		}
-		asm volatile("sti" : : : "memory");
+
+		preempt_disable();
+
+		do {
+
+			asm volatile("cli" : : : "memory");
+			do_exc_hv(regs);
+			asm volatile("sti" : : : "memory");
+
+		/*
+		 * Check pending event again after enabling interrupt.
+		 * Prevent missing pending interrupt.
+		 */
+		} while (sev_hv_pending());
+
+		preempt_enable();
+
+	} else {
+		preempt_disable();
+
+		do {
+			asm volatile("cli" : : : "memory");
+			if (sev_hv_pending()) {
+				memset(&local_regs, 0, sizeof(struct pt_regs));
+				regs = &local_regs;
+				asm volatile("movl %%cs, %%eax;" : "=a" (regs->cs));
+				asm volatile("movl %%ss, %%eax;" : "=a" (regs->ss));
+				regs->orig_ax = 0xffffffff;
+				regs->flags = native_save_fl();
+
+				do_exc_hv(regs);
+			}
+			asm volatile("sti" : : : "memory");
+
+		/*
+		 * Check pending event again after enabling interrupt.
+		 * Prevent missing pending interrupt.
+		 */
+		} while (sev_hv_pending());
+		preempt_enable();
 	}
 }
 
@@ -369,12 +415,9 @@ static void __init construct_sysvec_table(void)
 
 void __init sev_snp_init_hv_handling(void)
 {
-	struct sev_snp_runtime_data *snp_data;
 	struct ghcb_state state;
 	struct ghcb *ghcb;
 	unsigned long flags;
-	int cpu;
-	int err;
 
 	WARN_ON(!irqs_disabled());
 	if (!cc_platform_has(CC_ATTR_GUEST_SEV_SNP) || !sev_restricted_injection_enabled())
@@ -1609,7 +1652,7 @@ static void __init init_ghcb(int cpu)
 		panic("Can't map #HV doorbell pages unencrypted");
 
 	memset(&snp_data->hv_doorbell_page, 0, sizeof(snp_data->hv_doorbell_page));
-
+	snp_data->hv_handling_events = false;
 	per_cpu(snp_runtime_data, cpu) = snp_data;
 
 	data->ghcb_active = false;
@@ -2253,9 +2296,7 @@ DEFINE_IDTENTRY_VC_USER(exc_vmm_communication)
 
 static bool hv_raw_handle_exception(struct pt_regs *regs)
 {
-	sev_snp_current_doorbell_page()->pending_events.no_further_signal = 0;
 	check_hv_pending(regs);
-
 	return true;
 }
 
@@ -2560,6 +2601,7 @@ static int __init snp_init_platform_device(void)
 		return -ENODEV;
 
 	pr_info("SNP guest platform device initialized.\n");
+	pr_info("soft lockedup test.\n");
 	return 0;
 }
 device_initcall(snp_init_platform_device);
