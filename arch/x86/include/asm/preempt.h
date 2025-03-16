@@ -75,12 +75,12 @@ static __always_inline bool test_preempt_need_resched(void)
  * The various preempt_count add/sub methods
  */
 
-static __always_inline void __preempt_count_add(int val)
+extern __always_inline void __preempt_count_add(int val)
 {
 	raw_cpu_add_4(__preempt_count, val);
 }
 
-static __always_inline void __preempt_count_sub(int val)
+extern __always_inline void __preempt_count_sub(int val)
 {
 	raw_cpu_add_4(__preempt_count, -val);
 }

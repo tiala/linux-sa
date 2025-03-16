@@ -18,6 +18,9 @@
 void check_hv_pending(struct pt_regs *regs);
 #endif
 
+extern __always_inline void __preempt_count_add(int val);
+extern __always_inline void __preempt_count_sub(int val);
+
 /* Declaration required for gcc < 4.9 to prevent -Werror=missing-prototypes */
 extern inline unsigned long native_save_fl(void);
 extern __always_inline unsigned long native_save_fl(void)
@@ -44,11 +47,6 @@ extern inline void native_restore_fl(unsigned long flags)
 		     : /* no output */
 		     : "g" (flags)
 		     : "memory", "cc");
-#ifdef CONFIG_AMD_MEM_ENCRYPT
-	if ((flags & X86_EFLAGS_IF)) {
-		check_hv_pending(NULL);
-	}
-#endif
 }
 
 static __always_inline void native_irq_disable(void)
@@ -58,20 +56,23 @@ static __always_inline void native_irq_disable(void)
 
 static __always_inline void native_irq_enable(void)
 {
+	__preempt_count_add(1);
 	asm volatile("sti": : :"memory");
 #ifdef CONFIG_AMD_MEM_ENCRYPT
 	check_hv_pending(NULL);
 #endif
+	__preempt_count_sub(1);
 }
 
 static inline __cpuidle void native_safe_halt(void)
 {
 	mds_idle_clear_cpu_buffers();
+	__preempt_count_add(1);	
 	asm volatile("sti; hlt": : :"memory");
 #ifdef CONFIG_AMD_MEM_ENCRYPT
 	check_hv_pending(NULL);
 #endif
-
+	__preempt_count_sub(1);
 }
 
 static inline __cpuidle void native_halt(void)
