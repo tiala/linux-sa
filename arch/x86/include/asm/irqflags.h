@@ -67,12 +67,14 @@ static __always_inline void native_irq_enable(void)
 static inline __cpuidle void native_safe_halt(void)
 {
 	mds_idle_clear_cpu_buffers();
-	__preempt_count_add(1);	
-	asm volatile("sti; hlt": : :"memory");
+	__preempt_count_add(1);
+	asm volatile("sti": : :"memory");
 #ifdef CONFIG_AMD_MEM_ENCRYPT
 	check_hv_pending(NULL);
 #endif
 	__preempt_count_sub(1);
+
+	asm volatile("hlt": : :"memory");
 }
 
 static inline __cpuidle void native_halt(void)
