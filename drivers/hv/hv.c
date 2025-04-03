@@ -307,6 +307,7 @@ void hv_synic_enable_regs(unsigned int cpu)
 	}
 
 	hv_set_msr(HV_MSR_SIEFP, siefp.as_uint64);
+	hv_enable_coco_interrupt(cpu, vmbus_interrupt, true);
 
 	/* Setup the shared SINT. */
 	if (vmbus_irq != -1)
@@ -352,6 +353,7 @@ void hv_synic_disable_regs(unsigned int cpu)
 	/* Disable the interrupt */
 	hv_set_msr(HV_MSR_SINT0 + VMBUS_MESSAGE_SINT, shared_sint.as_uint64);
 
+	hv_enable_coco_interrupt(cpu, vmbus_interrupt, false);
 	simp.as_uint64 = hv_get_msr(HV_MSR_SIMP);
 	/*
 	 * In Isolation VM, sim and sief pages are allocated by
