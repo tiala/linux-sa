@@ -14,6 +14,7 @@
 
 #include <asm/apic.h>
 #include <asm/sev.h>
+#include <asm/mshyperv.h>
 
 #include "local.h"
 
@@ -357,23 +358,23 @@ static void savic_setup(void)
 	void *backing_page;
 	enum es_result res;
 	unsigned long gpa;
+	unsigned long gfn;
+
+	if (!cc_platform_has(CC_ATTR_SNP_SECURE_AVIC))
+		return;
 
 	backing_page = this_cpu_ptr(apic_page);
 	init_apic_page(backing_page);
 	gpa = __pa(backing_page);
 
-	/*
-	 * The NPT entry for a vCPU's APIC backing page must always be
-	 * present when the vCPU is running in order for Secure AVIC to
-	 * function. A VMEXIT_BUSY is returned on VMRUN and the vCPU cannot
-	 * be resumed if the NPT entry for the APIC backing page is not
-	 * present. Notify GPA of the vCPU's APIC backing page to the
-	 * hypervisor by calling savic_register_gpa(). Before executing
-	 * VMRUN, the hypervisor makes use of this information to make sure
-	 * the APIC backing page is mapped in NPT.
-	 */
-	res = savic_register_gpa(gpa);
-	if (res != ES_OK)
+	gfn = gpa >> PAGE_SHIFT;
+
+	if (hv_isolation_type_snp())
+		ret = hv_set_savic_backing_page(gfn);
+	else
+		ret = savic_register_gpa(gpa);
+
+	if (ret != ES_OK)
 		snp_abort();
 	savic_wr_control_msr(gpa | MSR_AMD64_SECURE_AVIC_EN | MSR_AMD64_SECURE_AVIC_ALLOWEDNMI);
 }
