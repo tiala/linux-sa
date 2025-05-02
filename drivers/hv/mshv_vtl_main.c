@@ -165,6 +165,9 @@ struct mshv_vtl_per_cpu {
 	bool urn_registered;
 	struct user_return_notifier mshv_urn;
 #endif
+#if defined(CONFIG_X86_64) && defined(CONFIG_SEV_GUEST)
+	struct page *secure_avic_page;
+#endif
 };
 
 static struct mutex	mshv_vtl_poll_file_lock;
@@ -194,12 +197,19 @@ static struct page *mshv_vtl_cpu_reg_page(int cpu)
 	return *per_cpu_ptr(&mshv_vtl_per_cpu.reg_page, cpu);
 }
 
-#if defined(CONFIG_X86_64) && defined(CONFIG_INTEL_TDX_GUEST)
+#if defined(CONFIG_X86_64)
 
 static struct page *tdx_apic_page(int cpu)
 {
+#if defined(CONFIG_INTEL_TDX_GUEST)
 	return *per_cpu_ptr(&mshv_vtl_per_cpu.tdx_apic_page, cpu);
+#else
+	(void)cpu;
+	return NULL;
+#endif
 }
+
+#if defined(CONFIG_INTEL_TDX_GUEST)
 
 static struct page *tdx_this_apic_page(void)
 {
@@ -237,7 +247,29 @@ static int mshv_tdx_set_cpumask_from_apicid(int apicid, struct cpumask *cpu_mask
 
 	return -EINVAL;
 }
+#endif /* defined(CONFIG_INTEL_TDX_GUEST) */
+
+static struct page *snp_secure_avic_page(int cpu)
+{
+#if defined(CONFIG_SEV_GUEST)
+	return *per_cpu_ptr(&mshv_vtl_per_cpu.secure_avic_page, cpu);
+#else
+	(void)cpu;
+	return NULL;
 #endif
+}
+
+static struct page* mshv_apic_page(int cpu)
+{
+	if (hv_isolation_type_tdx())
+		return tdx_apic_page(cpu);
+	else if (hv_isolation_type_snp())
+		return snp_secure_avic_page(cpu);
+
+	return NULL;
+}
+
+#endif /* defined(CONFIG_X86_64) */
 
 static long __mshv_vtl_ioctl_check_extension(u32 arg)
 {
@@ -623,12 +655,35 @@ static int mshv_vtl_alloc_context(unsigned int cpu)
 		mshv_write_tdx_apic_page(page_to_phys(tdx_apic_page));
 #endif
 	} else if (hv_isolation_type_snp()) {
-#ifdef CONFIG_X86_64
+#if defined(CONFIG_X86_64) && defined(CONFIG_SEV_GUEST)
 		int ret;
 
 		ret = mshv_configure_vmsa_page(0, &per_cpu->vmsa_page);
 		if (ret < 0)
 			return ret;
+
+		if (cc_platform_has(CC_ATTR_SNP_SECURE_AVIC)) {
+			struct page *page = alloc_page(GFP_KERNEL | __GFP_ZERO);
+			void *secure_avic_page;
+
+			if (!page)
+				return -ENOMEM;
+			secure_avic_page = page_address(page);
+
+			/* VMPL 2 for the VTL0 */
+			ret = rmpadjust((unsigned long)secure_avic_page,
+						RMP_PG_SIZE_4K, 2 | RMPADJUST_ENABLE_READ | RMPADJUST_ENABLE_WRITE);
+			if (ret) {
+				pr_err("failed to adjust RMP for the secure AVIC page: %d\n", ret);
+				free_page((u64)page);
+				return -EINVAL;
+			}
+			pr_debug("VTL0 secure AVIC page allocated, CPU %d\n", cpu);
+
+			/* is the environment quiet enough to capture a consistent state? */
+			x2apic_savic_init_backing_page(secure_avic_page);
+			per_cpu->secure_avic_page = secure_avic_page;
+		}
 #endif
 	} else if (mshv_vsm_capabilities.intercept_page_available)
 		mshv_vtl_configure_reg_page(per_cpu);
@@ -1899,7 +1954,7 @@ mshv_vtl_ioctl(struct file *filp, unsigned int ioctl, unsigned long arg)
 
 static vm_fault_t mshv_vtl_fault(struct vm_fault *vmf)
 {
-	struct page *page;
+	struct page *page = NULL;
 	int cpu = vmf->pgoff & MSHV_PG_OFF_CPU_MASK;
 	int real_off = vmf->pgoff >> MSHV_REAL_OFF_SHIFT;
 
@@ -1931,17 +1986,15 @@ static vm_fault_t mshv_vtl_fault(struct vm_fault *vmf)
 		if (!hv_isolation_type_snp())
 			return VM_FAULT_SIGBUS;
 		page = *per_cpu_ptr(&mshv_vtl_per_cpu.vmsa_page, cpu);
-#ifdef CONFIG_INTEL_TDX_GUEST
 	} else if (real_off == MSHV_APIC_PAGE_OFFSET) {
-		if (!hv_isolation_type_tdx())
-			return VM_FAULT_SIGBUS;
-
-		page = tdx_apic_page(cpu);
-#endif
+		page = mshv_apic_page(cpu);
 #endif
 	} else {
 		return VM_FAULT_NOPAGE;
 	}
+
+	if (!page)
+		return VM_FAULT_SIGBUS;
 
 	get_page(page);
 	vmf->page = page;
