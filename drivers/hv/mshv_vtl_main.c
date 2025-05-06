@@ -663,25 +663,23 @@ static int mshv_vtl_alloc_context(unsigned int cpu)
 			return ret;
 
 		if (cc_platform_has(CC_ATTR_SNP_SECURE_AVIC)) {
-			struct page *page = alloc_page(GFP_KERNEL | __GFP_ZERO);
-			void *secure_avic_page;
+			struct page *secure_avic_page = alloc_page(GFP_KERNEL | __GFP_ZERO);
 
-			if (!page)
+			if (!secure_avic_page)
 				return -ENOMEM;
-			secure_avic_page = page_address(page);
 
 			/* VMPL 2 for the VTL0 */
-			ret = rmpadjust((unsigned long)secure_avic_page,
+			ret = rmpadjust((unsigned long)page_address(secure_avic_page),
 						RMP_PG_SIZE_4K, 2 | RMPADJUST_ENABLE_READ | RMPADJUST_ENABLE_WRITE);
 			if (ret) {
 				pr_err("failed to adjust RMP for the secure AVIC page: %d\n", ret);
-				free_page((u64)page);
+				free_page((u64)secure_avic_page);
 				return -EINVAL;
 			}
 			pr_debug("VTL0 secure AVIC page allocated, CPU %d\n", cpu);
 
 			/* is the environment quiet enough to capture a consistent state? */
-			x2apic_savic_init_backing_page(secure_avic_page);
+			x2apic_savic_init_backing_page(page_address(secure_avic_page));
 			per_cpu->secure_avic_page = secure_avic_page;
 		}
 #endif
@@ -1889,6 +1887,41 @@ static long mshv_vtl_ioctl_guest_vsm_vmsa_pfn(void __user *user_arg)
 
 	return ret;
 }
+
+static void secure_avic_vtl0_this_cpu(void *arg)
+{
+	int cpu;
+	struct page *secure_avic_page;
+	u64 *pfn = arg;
+
+	cpu = get_cpu();
+	secure_avic_page = *this_cpu_ptr(&mshv_vtl_per_cpu.secure_avic_page);
+	put_cpu();
+
+	*pfn = secure_avic_page ? page_to_pfn(secure_avic_page) : -ENOMEM;
+}
+
+static long mshv_vtl_ioctl_secure_avic_vtl0_pfn(void __user *user_arg)
+{
+	u64 pfn;
+	u32 cpu_id;
+	long ret;
+
+	ret = copy_from_user(&cpu_id, user_arg, sizeof(cpu_id)) ? -EFAULT : 0;
+	if (ret)
+		return ret;
+
+	ret = smp_call_function_single(cpu_id, secure_avic_vtl0_this_cpu, &pfn, true);
+	if (ret)
+		return ret;
+	ret = (long)pfn;
+	if (ret < 0)
+		return ret;
+
+	ret = copy_to_user(user_arg, &pfn, sizeof(pfn)) ? -EFAULT : 0;
+
+	return ret;
+}
 #endif
 
 static long
@@ -1941,6 +1974,9 @@ mshv_vtl_ioctl(struct file *filp, unsigned int ioctl, unsigned long arg)
 		break;
 	case MSHV_VTL_GUEST_VSM_VMSA_PFN:
 		ret = mshv_vtl_ioctl_guest_vsm_vmsa_pfn((void __user *)arg);
+		break;
+	case MSHV_VTL_SECURE_AVIC_VTL0_PFN:
+		ret = mshv_vtl_ioctl_secure_avic_vtl0_pfn((void __user *)arg);
 		break;
 #endif
 
