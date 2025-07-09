@@ -415,6 +415,24 @@ void sev_show_status(void);
 void snp_update_svsm_ca(void);
 void snp_mshv_vtl_return(u8 target_vtl);
 static inline enum es_result savic_register_gpa(u64 gpa);
+=======
+int prepare_pte_enc(struct pte_enc_desc *d);
+void set_pte_enc_mask(pte_t *kpte, unsigned long pfn, pgprot_t new_prot);
+void snp_kexec_finish(void);
+void snp_kexec_begin(void);
+
+int snp_msg_init(struct snp_msg_desc *mdesc, int vmpck_id);
+struct snp_msg_desc *snp_msg_alloc(void);
+void snp_msg_free(struct snp_msg_desc *mdesc);
+int snp_send_guest_request(struct snp_msg_desc *mdesc, struct snp_guest_req *req,
+			   struct snp_guest_request_ioctl *rio);
+
+int snp_svsm_vtpm_send_command(u8 *buffer);
+
+void __init snp_secure_tsc_prepare(void);
+void __init snp_secure_tsc_init(void);
+enum es_result savic_register_gpa(u64 gpa);
+u64 savic_ghcb_msr_read(u32 reg);
 void savic_ghcb_msr_write(u32 reg, u64 value);
 
 #else	/* !CONFIG_AMD_MEM_ENCRYPT */
@@ -455,6 +473,7 @@ static inline void snp_update_svsm_ca(void) { }
 static inline void snp_mshv_vtl_return(u8 input_vtl) { }
 static inline enum es_result savic_register_gpa(u64 gpa) { return ES_UNSUPPORTED; }
 static inline void savic_ghcb_msr_write(u32 reg, u64 value) { }
+static inline u64 savic_ghcb_msr_read(u32 reg) { return 0; }
 
 #endif	/* CONFIG_AMD_MEM_ENCRYPT */
 
