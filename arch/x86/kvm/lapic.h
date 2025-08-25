@@ -171,11 +171,6 @@ static inline void kvm_lapic_set_irr(int vec, struct kvm_lapic *apic)
 	apic->irr_pending = true;
 }
 
-static inline u32 kvm_lapic_get_reg(struct kvm_lapic *apic, int reg_off)
-{
-	return __kvm_lapic_get_reg(apic->regs, reg_off);
-}
-
 DECLARE_STATIC_KEY_FALSE(kvm_has_noapic_vcpu);
 
 static inline bool lapic_in_kernel(struct kvm_vcpu *vcpu)
