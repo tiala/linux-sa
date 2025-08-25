@@ -638,9 +638,14 @@ int hv_common_cpu_init(unsigned int cpu)
 		hv_set_msr(HV_SYN_REG_VP_ASSIST_PAGE, vp_assist_reg.as_uint64);
 	}
 
-	/* Allow Hyper-V stimer vector to be injected from Hypervisor. */
-	if (ms_hyperv.misc_features & HV_STIMER_DIRECT_MODE_AVAILABLE)
-		hv_enable_coco_interrupt(cpu, vmbus_interrupt, true);
+
+
+	hv_enable_coco_interrupt(cpu, HYPERV_REENLIGHTENMENT_VECTOR, true);
+
+        hv_enable_coco_interrupt(cpu, HYPERV_STIMER0_VECTOR, true);
+
+        hv_enable_coco_interrupt(cpu, HYPERVISOR_CALLBACK_VECTOR, true);	
+
 	
 	return 0;
 }
@@ -954,7 +959,7 @@ int hv_call_deposit_pages(int node, u64 partition_id, u32 num_pages)
 	if (!num_pages)
 		return 0;
 
-	/* One buffer for page pointers and counts */
+	/* One buffer for page pointers and csounts */
 	page = alloc_page(GFP_KERNEL);
 	if (!page)
 		return -ENOMEM;

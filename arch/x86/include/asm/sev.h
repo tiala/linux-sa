@@ -414,7 +414,6 @@ u64 sev_get_status(void);
 void sev_show_status(void);
 void snp_update_svsm_ca(void);
 void snp_mshv_vtl_return(u8 target_vtl);
-static inline enum es_result savic_register_gpa(u64 gpa);
 enum es_result savic_register_gpa(u64 gpa);
 enum es_result savic_unregister_gpa(u64 *gpa);
 u64 savic_ghcb_msr_read(u32 reg);
