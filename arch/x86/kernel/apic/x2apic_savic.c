@@ -359,6 +359,7 @@ static void savic_setup(void)
 	enum es_result res;
 	unsigned long gpa;
 	unsigned long gfn;
+	int ret;
 
 	if (!cc_platform_has(CC_ATTR_SNP_SECURE_AVIC))
 		return;
@@ -369,6 +370,16 @@ static void savic_setup(void)
 
 	gfn = gpa >> PAGE_SHIFT;
 
+	/*
+	 * The NPT entry for a vCPU's APIC backing page must always be
+	 * present when the vCPU is running in order for Secure AVIC to
+	 * function. A VMEXIT_BUSY is returned on VMRUN and the vCPU cannot
+	 * be resumed if the NPT entry for the APIC backing page is not
+	 * present. Notify GPA of the vCPU's APIC backing page to the
+	 * hypervisor by calling savic_register_gpa(). Before executing
+	 * VMRUN, the hypervisor makes use of this information to make sure
+	 * the APIC backing page is mapped in NPT.
+	 */
 	if (hv_isolation_type_snp())
 		ret = hv_set_savic_backing_page(gfn);
 	else
