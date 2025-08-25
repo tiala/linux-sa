@@ -638,6 +638,10 @@ int hv_common_cpu_init(unsigned int cpu)
 		hv_set_msr(HV_SYN_REG_VP_ASSIST_PAGE, vp_assist_reg.as_uint64);
 	}
 
+	/* Allow Hyper-V stimer vector to be injected from Hypervisor. */
+	if (ms_hyperv.misc_features & HV_STIMER_DIRECT_MODE_AVAILABLE)
+		hv_enable_coco_interrupt(cpu, vmbus_interrupt, true);
+	
 	return 0;
 }
 
@@ -708,6 +712,10 @@ int hv_common_cpu_die(unsigned int cpu)
 		}
 		hv_set_msr(HV_SYN_REG_VP_ASSIST_PAGE, vp_assist_reg.as_uint64);
 	}
+
+	/* Allow Hyper-V stimer vector to be injected from Hypervisor. */
+	if (ms_hyperv.misc_features & HV_STIMER_DIRECT_MODE_AVAILABLE)
+		hv_enable_coco_interrupt(cpu, vmbus_interrupt, false);
 
 	return 0;
 }
