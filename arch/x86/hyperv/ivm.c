@@ -10,6 +10,7 @@
 #include <linux/hyperv.h>
 #include <linux/types.h>
 #include <linux/slab.h>
+#include <linux/cpu.h>
 #include <asm/svm.h>
 #include <asm/sev.h>
 #include <asm/io.h>
@@ -296,6 +297,7 @@ int hv_snp_boot_ap(u32 apic_id, unsigned long start_ip, unsigned int cpu)
 	struct sev_es_save_area *cur_vmsa;
 	struct desc_ptr gdtr;
 	struct hv_enable_vp_vtl *start_vp_input;
+	int cpu_id = -EINVAL;
 	unsigned long flags;
 	u64 ret, retry = 5;
 	int vp_index;
@@ -386,13 +388,13 @@ int hv_snp_boot_ap(u32 apic_id, unsigned long start_ip, unsigned int cpu)
 		vmsa = NULL;
 	}
 
-	cur_vmsa = per_cpu(hv_sev_vmsa, cpu);
+	cur_vmsa = per_cpu(hv_sev_vmsa, cpu_id);
 	/* Free up any previous VMSA page */
 	if (cur_vmsa)
 		snp_cleanup_vmsa(cur_vmsa);
 
 	/* Record the current VMSA page */
-	per_cpu(hv_sev_vmsa, cpu) = vmsa;
+	per_cpu(hv_sev_vmsa, cpu_id) = vmsa;
 
 	return ret;
 }
