@@ -84,10 +84,7 @@ hv_uio_irqcontrol(struct uio_info *info, s32 irq_state)
 	struct hv_uio_private_data *pdata = info->priv;
 	struct hv_device *dev = pdata->device;
 
-	if (!no_mask) {
-		dev->channel->inbound.ring_buffer->interrupt_mask = !irq_state;
-		virt_mb();
-	}
+	virt_mb();
 
 	if (!dev->channel->offermsg.monitor_allocated && irq_state)
 		vmbus_setevent(dev->channel);
@@ -171,9 +168,6 @@ hv_uio_new_channel(struct vmbus_channel *new_sc)
 		return;
 	}
 
-	/* Disable interrupts on sub channel */
-	if (!no_mask)
-		new_sc->inbound.ring_buffer->interrupt_mask = 1;
 	set_channel_read_mode(new_sc, HV_CALL_ISR);
 	ret = hv_create_ring_sysfs(new_sc, hv_uio_ring_mmap);
 	if (ret) {
@@ -216,10 +210,7 @@ hv_uio_open(struct uio_info *info, struct inode *inode)
 
 	ret = vmbus_connect_ring(dev->channel,
 				 hv_uio_channel_cb, dev->channel);
-	if (ret == 0) {
-		if (!no_mask)
-			dev->channel->inbound.ring_buffer->interrupt_mask = 1;
-	} else
+	if (ret)
 		atomic_dec(&pdata->refcnt);
 
 	return ret;
