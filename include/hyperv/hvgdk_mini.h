@@ -1170,6 +1170,28 @@ union hv_register_value {
 	union hv_arm64_pending_synthetic_exception_event pending_synthetic_exception_event;
 };
 
+/* HvSetVpRegisters hypercall with variable size reg name/value list*/
+struct hv_set_vp_registers_input {
+	struct {
+		u64 partitionid;
+		u32 vpindex;
+		u8  inputvtl;
+		u8  padding[3];
+	} header;
+	struct {
+		u32 name;
+		u32 padding1;
+		u64 padding2;
+		union {
+			union hv_register_value value;
+			struct {
+				u64 valuelow;
+				u64 valuehigh;
+			};
+		};
+	} element[];
+} __packed;
+
 /* NOTE: Linux helper struct - NOT from Hyper-V code. */
 struct hv_output_get_vp_registers {
 	DECLARE_FLEX_ARRAY(union hv_register_value, values);
@@ -1210,6 +1232,15 @@ struct hv_input_get_vp_registers {
 	u32 names[];
 } __packed;
 
+union hv_x64_register_sev_gpa_page {
+	u64 u64;
+	struct {
+		u64 enabled:1;
+		u64 reserved:11;
+		u64 pagenumber:52;
+	};
+} __packed;
+
 struct hv_input_set_vp_registers {
 	u64 partition_id;
 	u32 vp_index;
@@ -1229,6 +1260,14 @@ struct hv_send_ipi {	 /* HV_INPUT_SEND_SYNTHETIC_CLUSTER_IPI */
 } __packed;
 
 #define	HV_VTL_MASK			GENMASK(3, 0)
+
+/*
+ * Registers are only accessible via HVCALL_GET_VP_REGISTERS hvcall and
+ * there is not associated MSR address.
+ */
+#define	HV_X64_REGISTER_VSM_VP_STATUS	0x000D0003
+#define	HV_X64_VTL_MASK			GENMASK(3, 0)
+#define	HV_X64_REGISTER_SEV_AVIC_GPA    0x00090043
 
 /* Hyper-V memory host visibility */
 enum hv_mem_host_visibility {
