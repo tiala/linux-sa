@@ -36,6 +36,8 @@
 #include <linux/highmem.h>
 #include <linux/swiotlb.h>
 #include <linux/set_memory.h>
+#include <linux/dma-map-ops.h>
+#include <linux/dma-direct.h>
 
 void *hv_hypercall_pg;
 EXPORT_SYMBOL_GPL(hv_hypercall_pg);
@@ -45,6 +47,8 @@ union hv_ghcb * __percpu *hv_ghcb_pg;
 
 /* Storage to save the hypercall page temporarily for hibernation */
 static void *hv_hypercall_pg_saved;
+extern const struct dma_map_ops hyperv_dma_ops;
+extern const struct dma_map_ops *dma_ops;
 
 static int hyperv_init_ghcb(void)
 {
@@ -552,6 +556,7 @@ skip_hypercall_pg_init:
 	if (ms_hyperv.vtl > 0) /* non default VTL */
 		hv_vtl_early_init();
 
+	dma_ops = &hyperv_dma_ops;
 	return;
 
 clean_guest_os_id:
