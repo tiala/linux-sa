@@ -23,6 +23,7 @@
 #include <asm/mshyperv.h>
 
 #include "irq_remapping.h"
+#include "../../kernel/dma/direct.h"
 
 #ifdef CONFIG_IRQ_REMAP
 
@@ -332,3 +333,66 @@ static const struct irq_domain_ops hyperv_root_ir_domain_ops = {
 };
 
 #endif
+
+static int hyperv_dma_mmap(struct device *dev, struct vm_area_struct *vma,
+		void *cpu_addr, dma_addr_t dma_addr, size_t size,
+		unsigned long attrs)
+{
+	pr_info("%s dma addr %llx s`ize %llx.\n", dev_name(dev), size);
+
+	return dma_common_mmap(dev, vma, cpu_addr, dma_addr, size, attrs);
+
+}
+
+static dma_addr_t hyperv_dma_map_page(struct device *dev, struct page *page,
+		unsigned long offset, size_t size, enum dma_data_direction dir,
+		unsigned long attrs)
+{
+	return dma_direct_map_page(dev, page, offset, size, dir, attrs);
+}
+
+static void hyperv_dma_unmap_page(struct device *dev, dma_addr_t dma_handle,
+		size_t size, enum dma_data_direction dir, unsigned long attrs)
+{
+	/*
+	 * Dummy ops doesn't support map_page, so unmap_page should never be
+	 * called.
+	 */
+	dma_direct_unmap_page(dev, dma_handle, size, dir, attrs);
+}
+
+static int hyperv_dma_map_sg(struct device *dev, struct scatterlist *sgl,
+		int nelems, enum dma_data_direction dir,
+		unsigned long attrs)
+{
+	return dma_direct_map_sg(dev, sgl, nelems, dir, attrs);
+}
+
+static void hyperv_dma_unmap_sg(struct device *dev, struct scatterlist *sgl,
+		int nelems, enum dma_data_direction dir,
+		unsigned long attrs)
+{
+
+	/*
+	 * Dummy ops doesn't support map_sg, so unmap_sg should never be called.
+	 */
+	dma_direct_unmap_sg(dev, sgl, nelems, dir, attrs);
+}
+
+static int hyperv_dma_supported(struct device *hwdev, u64 mask)
+{
+	return 1;
+}
+
+const struct dma_map_ops hyperv_dma_ops = {
+	.mmap                   = hyperv_dma_mmap,
+	.map_page               = hyperv_dma_map_page,
+	.unmap_page             = hyperv_dma_unmap_page,
+	.map_sg                 = hyperv_dma_map_sg,
+	.unmap_sg               = hyperv_dma_unmap_sg,
+	.dma_supported          = hyperv_dma_supported,
+	.max_mapping_size = swiotlb_max_mapping_size,
+	.map_resource = dma_direct_map_resource,	
+};
+
+//EXPORT_SYMBOL_GPL(hyperv_dma_ops);

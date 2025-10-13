@@ -165,12 +165,14 @@ dma_addr_t dma_map_page_attrs(struct device *dev, struct page *page,
 		return DMA_MAPPING_ERROR;
 
 	if (dma_map_direct(dev, ops) ||
-	    arch_dma_map_page_direct(dev, page_to_phys(page) + offset + size))
-		addr = dma_direct_map_page(dev, page, offset, size, dir, attrs);
-	else if (use_dma_iommu(dev))
+	    arch_dma_map_page_direct(dev, page_to_phys(page) + offset + size)) {
+ 		addr = dma_direct_map_page(dev, page, offset, size, dir, attrs);
+	} else if (use_dma_iommu(dev)) {
 		addr = iommu_dma_map_page(dev, page, offset, size, dir, attrs);
-	else
+	} else {
 		addr = ops->map_page(dev, page, offset, size, dir, attrs);
+	}
+
 	kmsan_handle_dma(page, offset, size, dir);
 	trace_dma_map_page(dev, page_to_phys(page) + offset, addr, size, dir,
 			   attrs);
@@ -210,12 +212,13 @@ static int __dma_map_sg_attrs(struct device *dev, struct scatterlist *sg,
 		return 0;
 
 	if (dma_map_direct(dev, ops) ||
-	    arch_dma_map_sg_direct(dev, sg, nents))
+	    arch_dma_map_sg_direct(dev, sg, nents)) {
 		ents = dma_direct_map_sg(dev, sg, nents, dir, attrs);
-	else if (use_dma_iommu(dev))
+	} else if (use_dma_iommu(dev)) {
 		ents = iommu_dma_map_sg(dev, sg, nents, dir, attrs);
-	else
+	} else {
 		ents = ops->map_sg(dev, sg, nents, dir, attrs);
+	}
 
 	if (ents > 0) {
 		kmsan_handle_dma_sg(sg, nents, dir);

@@ -450,9 +450,9 @@ void dma_direct_unmap_sg(struct device *dev, struct scatterlist *sgl,
 	int i;
 
 	for_each_sg(sgl,  sg, nents, i) {
-		if (sg_dma_is_bus_address(sg))
-			sg_dma_unmark_bus_address(sg);
-		else
+		//if (sg_dma_is_bus_address(sg))
+		//	sg_dma_unmark_bus_address(sg);
+		//else
 			dma_direct_unmap_page(dev, sg->dma_address,
 					      sg_dma_len(sg), dir, attrs);
 	}
@@ -478,6 +478,7 @@ int dma_direct_map_sg(struct device *dev, struct scatterlist *sgl, int nents,
 		case PCI_P2PDMA_MAP_NONE:
 			sg->dma_address = dma_direct_map_page(dev, sg_page(sg),
 					sg->offset, sg->length, dir, attrs);
+			pr_info("%s %d map page size %llx \n", __func__, __LINE__, sg->length);
 			if (sg->dma_address == DMA_MAPPING_ERROR) {
 				ret = -EIO;
 				goto out_unmap;
