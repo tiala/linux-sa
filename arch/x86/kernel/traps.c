@@ -835,6 +835,10 @@ asmlinkage __visible noinstr struct pt_regs *hv_switch_off_ist(struct pt_regs *r
 		goto sync;
 	}
 
+	if (get_stack_info_noinstr(stack, current, &info) &&
+	    (info.type == (STACK_TYPE_EXCEPTION + ESTACK_HV)))
+		 WARN_ONCE(1, "Nested #HV exception.\n");
+
 	/*
 	 * From here on the RSP value is trusted. Now check whether entry
 	 * happened from a safe stack. Not safe are the entry or unknown stacks,
@@ -843,25 +847,10 @@ asmlinkage __visible noinstr struct pt_regs *hv_switch_off_ist(struct pt_regs *r
 	sp    = regs->sp;
 	stack = (unsigned long *)sp;
 
-	/*
-	 * We support nested #HV exceptions once the IST stack is
-	 * switched out. The HV can always inject an #HV, but as per
-	 * GHCB specs, the HV will not inject another #HV, if
-	 * PendingEvent.NoFurtherSignal is set and we only clear this
-	 * after switching out the IST stack and handling the current
-	 * #HV. But there is still a window before the IST stack is
-	 * switched out, where a malicious HV can inject nested #HV.
-	 * The code below checks the interrupted stack to check if
-	 * it is the IST stack, and if so panic as this is
-	 * not supported and this nested #HV would have corrupted
-	 * the iret frame of the previous #HV on the IST stack.
-	 */
-	if (get_stack_info_noinstr(stack, current, &info) &&
-	    (info.type == (STACK_TYPE_EXCEPTION + ESTACK_HV) ||
-	     info.type == (STACK_TYPE_EXCEPTION + ESTACK_HV2)))
-		panic("Nested #HV exception, HV IST corrupted, stack type = %d\n", info.type);
-
-	if (!get_stack_info_noinstr(stack, current, &info) || info.type == STACK_TYPE_ENTRY ||
+	if ((info.type == (STACK_TYPE_EXCEPTION + ESTACK_HV2))
+	     && sp <= __this_cpu_ist_bottom_va(HV2))
+		WARN_ONCE(1, "sp is under the bottom of #HV2 stack.\n");
+	else if (!get_stack_info_noinstr(stack, current, &info) || info.type == STACK_TYPE_ENTRY ||
 	    info.type > STACK_TYPE_EXCEPTION_LAST)
 		sp = __this_cpu_ist_top_va(HV2);
 sync:
