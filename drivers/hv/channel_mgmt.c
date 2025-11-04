@@ -1013,6 +1013,7 @@ static bool vmbus_is_valid_offer(const struct vmbus_channel_offer_channel *offer
 	return false;
 }
 
+int hviommu_switch = 0;
 /*
  * vmbus_onoffer - Handler for channel offers from vmbus in parent partition.
  *
@@ -1023,6 +1024,7 @@ static void vmbus_onoffer(struct vmbus_channel_message_header *hdr)
 	struct vmbus_channel *oldchannel, *newchannel;
 	size_t offer_sz;
 	bool co_ring_buffer, co_external_memory;
+	struct device *dev;
 
 	offer = (struct vmbus_channel_offer_channel *)hdr;
 
@@ -1037,16 +1039,17 @@ static void vmbus_onoffer(struct vmbus_channel_message_header *hdr)
 
 	co_ring_buffer = is_co_ring_buffer(offer);
 	co_external_memory = is_co_external_memory(offer);
-	if (co_ring_buffer || co_external_memory)	
-		pr_info("get co device object (relid %d).\n",	
-				newchannel->offermsg.child_relid);
-
+	if (co_ring_buffer || co_external_memory) {	
+		pr_info("get co device object co ring %d co external %d.\n",	
+			co_ring_buffer, co_external_memory);
+	}
 
 	if (!co_ring_buffer && co_external_memory) {
 		pr_err("Invalid offer relid=%d: the ring buffer isn't encrypted\n",
 			offer->child_relid);
 		return;
 	}
+
 	if (co_ring_buffer || co_external_memory) {
 		if (vmbus_proto_version < VERSION_WIN10_V6_0 || !vmbus_is_confidential()) {
 			pr_err("Invalid offer relid=%d: no support for confidential VMBus\n",
@@ -1135,8 +1138,7 @@ static void vmbus_onoffer(struct vmbus_channel_message_header *hdr)
 		return;
 	}
 	newchannel->co_ring_buffer = co_ring_buffer;
-	newchannel->co_external_memory = co_external_memory;
-
+	newchannel->co_external_memory = co_external_memory;	
 	vmbus_setup_channel_state(newchannel, offer);
 
 	vmbus_process_offer(newchannel);
