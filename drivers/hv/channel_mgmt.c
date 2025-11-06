@@ -96,7 +96,7 @@ const struct vmbus_device vmbus_devs[] = {
 	{ .dev_type = HV_KVP,
 	  HV_KVP_GUID,
 	  .perf_device = false,
-	  .allowed_in_isolated = false,
+	  .allowed_in_isolated = true,
 	},
 
 	/* Time Synch */
@@ -1013,6 +1013,7 @@ static bool vmbus_is_valid_offer(const struct vmbus_channel_offer_channel *offer
 	return false;
 }
 
+int hviommu_switch = 0;
 /*
  * vmbus_onoffer - Handler for channel offers from vmbus in parent partition.
  *
@@ -1023,6 +1024,7 @@ static void vmbus_onoffer(struct vmbus_channel_message_header *hdr)
 	struct vmbus_channel *oldchannel, *newchannel;
 	size_t offer_sz;
 	bool co_ring_buffer, co_external_memory;
+	struct device *dev;
 
 	offer = (struct vmbus_channel_offer_channel *)hdr;
 
@@ -1037,10 +1039,10 @@ static void vmbus_onoffer(struct vmbus_channel_message_header *hdr)
 
 	co_ring_buffer = is_co_ring_buffer(offer);
 	co_external_memory = is_co_external_memory(offer);
-	if (co_ring_buffer || co_external_memory)	
-		pr_info("get co device object (relid %d).\n",	
-				newchannel->offermsg.child_relid);
-
+	if (co_ring_buffer || co_external_memory) {	
+		pr_info("get co device object co ring %d co external %d.\n",	
+			co_ring_buffer, co_external_memory);
+	}
 
 	if (!co_ring_buffer && co_external_memory) {
 		pr_err("Invalid offer relid=%d: the ring buffer isn't encrypted\n",

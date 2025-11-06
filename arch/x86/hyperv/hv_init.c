@@ -83,6 +83,8 @@ static void *hv_hypercall_pg_saved;
 
 struct hv_vp_assist_page **hv_vp_assist_page;
 EXPORT_SYMBOL_GPL(hv_vp_assist_page);
+extern const struct dma_map_ops hyperv_dma_ops;
+extern const struct dma_map_ops *dma_ops;
 
 static int hyperv_init_ghcb(void)
 {
@@ -599,6 +601,7 @@ skip_hypercall_pg_init:
 	if (ms_hyperv.vtl > 0) /* non default VTL */
 		hv_vtl_early_init();
 
+	dma_ops = &hyperv_dma_ops;
 	return;
 
 clean_guest_os_id:

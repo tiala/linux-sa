@@ -23,6 +23,7 @@
 #include <asm/mshyperv.h>
 
 #include "irq_remapping.h"
+#include "../../kernel/dma/direct.h"
 
 #ifdef CONFIG_IRQ_REMAP
 
@@ -332,3 +333,93 @@ static const struct irq_domain_ops hyperv_root_ir_domain_ops = {
 };
 
 #endif
+
+extern int hviommu_switch;
+
+static int hyperv_dma_mmap(struct device *dev, struct vm_area_struct *vma,
+		void *cpu_addr, dma_addr_t dma_addr, size_t size,
+		unsigned long attrs)
+{
+	return dma_common_mmap(dev, vma, cpu_addr, dma_addr, size, attrs);
+}
+
+static dma_addr_t hyperv_dma_map_page(struct device *dev, struct page *page,
+		unsigned long offset, size_t size, enum dma_data_direction dir,
+		unsigned long attrs)
+{
+	phys_addr_t phys = page_to_phys(page) + offset;
+	dma_addr_t dma_addr;
+
+	if (!dev->use_priv_pages_for_io) {	
+		return dma_direct_map_phys(dev, phys, size, dir, attrs);
+	} else {
+		if (attrs & DMA_ATTR_MMIO)
+			dma_addr = phys;
+		else
+			dma_addr = __phys_to_dma(dev, phys);
+		return dma_addr;
+	}
+}
+
+static void hyperv_dma_unmap_page(struct device *dev, dma_addr_t dma_handle,
+		size_t size, enum dma_data_direction dir, unsigned long attrs)
+{
+	if (!dev->use_priv_pages_for_io)
+		dma_direct_unmap_phys(dev, dma_handle, size, dir, attrs);
+}
+
+static int hyperv_dma_map_sg(struct device *dev, struct scatterlist *sgl,
+		int nelems, enum dma_data_direction dir,
+		unsigned long attrs)
+{
+	struct scatterlist *sg;
+	dma_addr_t dma_addr;
+	int i;
+
+	if (dev->use_priv_pages_for_io) {
+		for_each_sg(sgl, sg, nelems, i) {
+			if (attrs & DMA_ATTR_MMIO)
+				dma_addr = sg_phys(sg);
+			else
+				dma_addr = __phys_to_dma(dev, sg_phys(sg));
+
+			sg->dma_address = dma_addr;
+			sg_dma_len(sg) = sg->length;
+		}
+		return nelems;
+	} else {
+		return dma_direct_map_sg(dev, sgl, nelems, dir, attrs);
+	}
+}
+
+static void hyperv_dma_unmap_sg(struct device *dev, struct scatterlist *sgl,
+		int nelems, enum dma_data_direction dir,
+		unsigned long attrs)
+{
+	if (!dev->use_priv_pages_for_io)
+		dma_direct_unmap_sg(dev, sgl, nelems, dir, attrs);
+}
+
+struct io_tlb_mem private_mem;
+
+static int hyperv_dma_supported(struct device *hwdev, u64 mask)
+{
+	hwdev->coherent_dma_mask = mask;	
+	return 1;
+}
+
+static size_t hyperv_dma_max_mapping_size(struct device *dev)
+{
+	return SIZE_MAX;
+}
+
+const struct dma_map_ops hyperv_dma_ops = {
+	.mmap                   = hyperv_dma_mmap,
+	.map_page               = hyperv_dma_map_page,
+	.unmap_page             = hyperv_dma_unmap_page,
+	.map_sg                 = hyperv_dma_map_sg,
+	.unmap_sg               = hyperv_dma_unmap_sg,
+	.dma_supported          = hyperv_dma_supported,
+	.max_mapping_size	= hyperv_dma_max_mapping_size,
+};
+

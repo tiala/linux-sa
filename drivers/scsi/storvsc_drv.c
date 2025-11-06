@@ -739,6 +739,7 @@ static void  handle_multichannel_storage(struct hv_device *device, int max_chns)
 	if (!stor_device)
 		return;
 
+	pr_info("subchannel num sc %d.\n", num_sc);
 	stor_device->num_sc = num_sc;
 	request = &stor_device->init_request;
 	vstor_packet = &request->vstor_packet;
@@ -862,6 +863,10 @@ static int storvsc_channel_init(struct hv_device *device, bool is_fc)
 
 	request = &stor_device->init_request;
 	vstor_packet = &request->vstor_packet;
+
+	device->device.use_priv_pages_for_io = device->channel->co_external_memory;
+	if (device->device.use_priv_pages_for_io)
+		pr_info(" %s using external private memory.\n", dev_name(&device->device));
 
 	/*
 	 * Now, initiate the vsc/vsp initialization protocol on the open
