@@ -1037,6 +1037,11 @@ static void vmbus_onoffer(struct vmbus_channel_message_header *hdr)
 
 	co_ring_buffer = is_co_ring_buffer(offer);
 	co_external_memory = is_co_external_memory(offer);
+	if (co_ring_buffer || co_external_memory) {
+		pr_info("get co device object co ring %d co external %d.\n",
+			co_ring_buffer, co_external_memory);
+	}
+
 	if (!co_ring_buffer && co_external_memory) {
 		pr_err("Invalid offer relid=%d: the ring buffer isn't encrypted\n",
 			offer->child_relid);
