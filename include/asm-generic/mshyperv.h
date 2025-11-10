@@ -288,6 +288,12 @@ do { \
 #define hv_status_debug(status, fmt, ...) \
 	hv_status_printk(debug, status, fmt, ##__VA_ARGS__)
 
+#if IS_ENABLED(CONFIG_HYPERV_IOMMU)
+void hyperv_register_dma_ops(void);
+#else
+static inline void hyperv_register_dma_ops(void) {}
+#endif
+
 const char *hv_result_to_string(u64 hv_status);
 int hv_result_to_errno(u64 status);
 void hyperv_report_panic(struct pt_regs *regs, long err, bool in_die);
