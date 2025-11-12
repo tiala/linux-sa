@@ -410,11 +410,14 @@ static size_t hyperv_dma_max_mapping_size(struct device *dev)
 }
 
 const struct dma_map_ops hyperv_dma_ops = {
+	.mmap                   = dma_common_mmap,					   
 	.map_page               = hyperv_dma_map_page,
 	.unmap_page             = hyperv_dma_unmap_page,
 	.map_sg                 = hyperv_dma_map_sg,
 	.unmap_sg               = hyperv_dma_unmap_sg,
 	.dma_supported          = hyperv_dma_supported,
+	.alloc			= dma_direct_alloc,
+	.free			= dma_direct_free,
 	.max_mapping_size	= hyperv_dma_max_mapping_size,
 };
 
