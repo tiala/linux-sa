@@ -24,9 +24,6 @@
 #include <asm/mshyperv.h>
 
 #include "irq_remapping.h"
-#include "../../kernel/dma/direct.h"
-
-extern const struct dma_map_ops *dma_ops;
 
 #ifdef CONFIG_IRQ_REMAP
 
@@ -336,92 +333,3 @@ static const struct irq_domain_ops hyperv_root_ir_domain_ops = {
 };
 
 #endif
-
-static bool hyperv_private_memory_dma(struct device *dev)
-{
-	struct hv_device *hv_dev = device_to_hv_device(dev);
-
-	if (hv_dev && hv_dev->channel && hv_dev->channel->co_external_memory)
-		return true;
-	else
-		return false;
-}
-
-static dma_addr_t hyperv_dma_map_page(struct device *dev, struct page *page,
-		unsigned long offset, size_t size,
-		enum dma_data_direction dir,
-		unsigned long attrs)
-{
-	phys_addr_t phys = page_to_phys(page) + offset;
-
-	if (hyperv_private_memory_dma(dev))
-		return __phys_to_dma(dev, phys);
-	else
-		return dma_direct_map_phys(dev, phys, size, dir, attrs);
-}
-
-static void hyperv_dma_unmap_page(struct device *dev, dma_addr_t dma_handle,
-		size_t size, enum dma_data_direction dir, unsigned long attrs)
-{
-	if (!hyperv_private_memory_dma(dev))
-		dma_direct_unmap_phys(dev, dma_handle, size, dir, attrs);
-}
-
-static int hyperv_dma_map_sg(struct device *dev, struct scatterlist *sgl,
-		int nelems, enum dma_data_direction dir,
-		unsigned long attrs)
-{
-	struct scatterlist *sg;
-	dma_addr_t dma_addr;
-	int i;
-
-	if (hyperv_private_memory_dma(dev)) {
-		for_each_sg(sgl, sg, nelems, i) {
-			dma_addr = __phys_to_dma(dev, sg_phys(sg));
-			sg_dma_address(sg) = dma_addr;
-			sg_dma_len(sg) = sg->length;
-		}
-
-		return nelems;
-	} else {
-		return dma_direct_map_sg(dev, sgl, nelems, dir, attrs);
-	}
-}
-
-static void hyperv_dma_unmap_sg(struct device *dev, struct scatterlist *sgl,
-		int nelems, enum dma_data_direction dir, unsigned long attrs)
-{
-	if (!hyperv_private_memory_dma(dev))
-		dma_direct_unmap_sg(dev, sgl, nelems, dir, attrs);
-}
-
-static int hyperv_dma_supported(struct device *dev, u64 mask)
-{
-	dev->coherent_dma_mask = mask;
-	return 1;
-}
-
-static size_t hyperv_dma_max_mapping_size(struct device *dev)
-{
-	if (hyperv_private_memory_dma(dev))
-		return SIZE_MAX;
-	else
-		return swiotlb_max_mapping_size(dev);
-}
-
-const struct dma_map_ops hyperv_dma_ops = {
-	.mmap                   = dma_common_mmap,					   
-	.map_page               = hyperv_dma_map_page,
-	.unmap_page             = hyperv_dma_unmap_page,
-	.map_sg                 = hyperv_dma_map_sg,
-	.unmap_sg               = hyperv_dma_unmap_sg,
-	.dma_supported          = hyperv_dma_supported,
-	.alloc			= dma_direct_alloc,
-	.free			= dma_direct_free,
-	.max_mapping_size	= hyperv_dma_max_mapping_size,
-};
-
-void hyperv_register_dma_ops(void)
-{
-	dma_ops = &hyperv_dma_ops;
-}
