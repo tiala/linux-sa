@@ -1455,17 +1455,18 @@ static dma_addr_t hyperv_dma_map_page(struct device *dev, struct page *page,
 {
 	phys_addr_t phys = page_to_phys(page) + offset;
 
-	if (hyperv_private_memory_dma(dev))
-		return __phys_to_dma(dev, phys);
-	else
-		return dma_direct_map_phys(dev, phys, size, dir, attrs);
+	//	if (hyperv_private_memory_dma(dev))
+	//	return
+	return dma_direct_map_phys(dev, phys, size, dir, attrs);
+	
+	//	return __phys_to_dma(dev, phys);
 }
 
 static void hyperv_dma_unmap_page(struct device *dev, dma_addr_t dma_handle,
 		size_t size, enum dma_data_direction dir, unsigned long attrs)
 {
-	if (!hyperv_private_memory_dma(dev))
-		dma_direct_unmap_phys(dev, dma_handle, size, dir, attrs);
+	//if (!hyperv_private_memory_dma(dev))
+	dma_direct_unmap_phys(dev, dma_handle, size, dir, attrs);
 }
 
 static int hyperv_dma_map_sg(struct device *dev, struct scatterlist *sgl,
@@ -1504,9 +1505,9 @@ static int hyperv_dma_supported(struct device *dev, u64 mask)
 
 static size_t hyperv_dma_max_mapping_size(struct device *dev)
 {
-	if (hyperv_private_memory_dma(dev))
-		return SIZE_MAX;
-	else
+	//if (hyperv_private_memory_dma(dev))
+	//	return SIZE_MAX;
+	//else
 		return swiotlb_max_mapping_size(dev);
 }
 
@@ -1581,7 +1582,7 @@ static int vmbus_bus_init(void)
 		pr_info("Establishing connection to the confidential VMBus\n");
 		//hyperv_register_dma_ops();
 	}
-	hyperv_register_dma_ops();
+        hyperv_register_dma_ops();
 
 	hv_para_set_sint_proxy(!is_confidential);
 	ret = vmbus_alloc_synic_and_connect();
