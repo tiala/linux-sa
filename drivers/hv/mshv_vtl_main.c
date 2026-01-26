@@ -903,9 +903,8 @@ DEFINE_PER_CPU(struct task_struct *, mshv_vtl_thread);
 static void mshv_vtl_switch_to_vtl0_irqoff(void)
 {
 	struct hv_vp_assist_page *hvp;
-	struct mshv_vtl_cpu_context *cpu_ctx = &mshv_vtl_this_run()->cpu_context;
 	struct mshv_vtl_run *this_run = mshv_vtl_this_run();
-	struct hv_vtl_cpu_context *cpu_ctx = &this_run->cpu_context;
+	struct mshv_vtl_cpu_context *cpu_ctx = &mshv_vtl_this_run()->cpu_context;
 	u32 flags = READ_ONCE(this_run->flags);
 
 	trace_mshv_vtl_enter_vtl0(cpu_ctx);
@@ -932,12 +931,12 @@ static void mshv_vtl_switch_to_vtl0_irqoff(void)
 		       min_t(u32, offset, sizeof(hvp->vtl_ret_actions)));
 	}
 
-	hv_vtl_return(cpu_ctx, flags, mshv_vsm_page_offsets.vtl_return_offset);
+	mshv_vtl_return(cpu_ctx);
 
 	if (!hvp)
 		return;
 
-	trace_mshv_vtl_exit_vtl0_rcuidle(hvp->vtl_entry_reason, cpu_ctx);
+	trace_mshv_vtl_exit_vtl0(hvp->vtl_entry_reason, cpu_ctx);
 }
 
 static void mshv_vtl_idle(void)
