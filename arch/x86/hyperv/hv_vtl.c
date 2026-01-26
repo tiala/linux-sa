@@ -30,7 +30,6 @@
 #include "../../drivers/hv/mshv_vtl.h"
 
 #include <asm/mshyperv.h>
-#include <uapi/hyperv/hvgdk.h>
 
 extern void hv_tdx_trampoline(void);
 extern struct boot_params boot_params;
@@ -371,20 +370,18 @@ restore:
 	return 0;
 }
 
-static int hv_vtl_apicid_to_vp_id(u32 apic_id)
+static int hv_vtl_wakeup_secondary_cpu(u32 apicid, unsigned long start_eip, unsigned int cpu)
 {
 	int vp_index;
 
 	pr_debug("Bringing up CPU with APIC ID %d in VTL2...\n", apicid);
-	vp_index = hv_apicid_to_vp_index(apicid);
 
 	/*
 	 * TODO TDX: we cannot trust the hypervisor to perform this mapping...
 	 * Instead, we need hypervisor support for TDX 1.5 ENUM_TOPOLOGY to
 	 * query this directly from the TDX module.
 	 */
-	vp_id = hv_vtl_apicid_to_vp_id(apicid);
-
+	vp_index = hv_apicid_to_vp_index(apicid);
 	if (vp_index < 0) {
 		pr_err("Couldn't find CPU with APIC ID %d\n", apicid);
 		return -EINVAL;
@@ -395,10 +392,18 @@ static int hv_vtl_apicid_to_vp_id(u32 apic_id)
 	}
 
 	if (hv_isolation_type_tdx())
-		return hv_vtl_bringup_tdx_vcpu(vp_id, start_eip);
+		return hv_vtl_bringup_tdx_vcpu(vp_index, start_eip);
 	else
-		return hv_vtl_bringup_vcpu(vp_id, cpu, start_eip);
->>>>>>> 488bea381bd0 (x86/hyperv: Use Hyper-V reset page to boot tdx APs)
+		return hv_vtl_bringup_vcpu(vp_index, apicid, start_eip);
+}
+
+/*
+ * The only way to restart in the VTL mode is to triple fault as the kernel runs
+ * as firmware.
+ */
+static void  __noreturn hv_vtl_restart(char __maybe_unused *cmd)
+{
+       hv_vtl_emergency_restart();
 }
 
 int __init hv_vtl_early_init(void)
