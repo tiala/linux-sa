@@ -239,6 +239,9 @@ static struct miscdevice mshv_dev = {
 	.fops = &mshv_dev_fops,
 	.mode = 0600,
 };
+noinline void mshv_vtl_return_tdx(void);
+struct mshv_vtl_run *mshv_vtl_this_run(void);
+void mshv_tdx_request_cache_flush(bool wbnoinvd);
 
 struct mshv_vtl_run *mshv_vtl_this_run(void)
 {
@@ -906,6 +909,16 @@ void mshv_vtl_return(struct mshv_vtl_cpu_context *vtl0)
 }
 
 #if defined(CONFIG_X86_64) && defined(CONFIG_INTEL_TDX_GUEST)
+/* Request a cache flush via TDG.VP.VMMCALL */
+void mshv_tdx_request_cache_flush(bool wbnoinvd)
+{
+	struct tdx_module_args args = {};
+
+	args.r11 = 0x36; /* WBINVD call code */
+	args.r12 = wbnoinvd ? 1 : 0; /* WBINVD/WBNOINVD indicator */
+	__tdx_hypercall(&args);
+}
+
 #define TDCALL_ASM	".byte 0x66,0x0f,0x01,0xcc"
 
 /* TODO TDX: Confirm noinline produces the right asm for saving register state */
@@ -1012,6 +1025,7 @@ noinline void mshv_vtl_return_tdx(void)
 	kernel_fpu_end();
 }
 #else
+void mshv_tdx_request_cache_flush(bool wbnoinvd) { }
 noinline void mshv_vtl_return_tdx(void) { }
 #endif
 
