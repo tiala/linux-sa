@@ -855,7 +855,6 @@ static int mshv_vtl_ioctl_set_poll_file(struct mshv_vtl_set_poll_file __user *us
 
 
 noinline void mshv_vtl_return_tdx(void);
-extern void __cpuidle tdx_safe_halt(void);
 
 void mshv_vtl_return(struct mshv_vtl_cpu_context *vtl0)
 {
@@ -863,12 +862,25 @@ void mshv_vtl_return(struct mshv_vtl_cpu_context *vtl0)
 
 #if defined(CONFIG_X86_64)
 	if (hv_isolation_type_tdx()) {
+		/* Read and clear tdx specific flags set by usermode. */
+		u64 tdx_flags = READ_ONCE(mshv_vtl_this_run()->tdx_context.vp_state.flags);
+		mshv_vtl_this_run()->tdx_context.vp_state.flags = 0;
+		
 		/*
 		 * Clear RAX to an exit (PENDING_INTERRUPT) that the usermode
 		 * VMM will do nothing, if we are halting.
 		 */
 		mshv_vtl_this_run()->tdx_context.exit_info.rax = 0x112000000000;
 
+		/* Handle any flags set by usermode. */
+		if (unlikely(tdx_flags)) {
+			/* Handle any cache invalidation requests from usermode. */
+			if (tdx_flags & MSHV_VTL_TDX_VP_STATE_FLAG_WBINVD)
+				mshv_tdx_request_cache_flush(false);
+			else if (tdx_flags & MSHV_VTL_TDX_VP_STATE_FLAG_WBNOINVD)
+				mshv_tdx_request_cache_flush(true);
+		}
+		
 		if (unlikely(mshv_vtl_this_run()->flags & MSHV_VTL_RUN_FLAG_HALTED)) {
 			tdx_safe_halt();
 		} else {
@@ -1247,7 +1259,7 @@ mshv_vtl_ioctl_get_regs(void __user *user_args)
 		return -EINVAL;
 
 	if (copy_from_user(&reg, (void __user *)args.regs_ptr,
-			   sizeof(reg)))
+	    sizeof(reg)))
 		return -EFAULT;
 
 		ret = mshv_vtl_get_set_reg(&reg, false, mshv_vsm_capabilities.dr6_shared);
