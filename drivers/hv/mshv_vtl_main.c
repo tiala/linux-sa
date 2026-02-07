@@ -1029,8 +1029,6 @@ static void mshv_vtl_switch_to_vtl0_irqoff(void)
 
 	/* A VTL2 TDX kernel doesn't allocate hv_vp_assist_page at the moment */
 	hvp = hv_vp_assist_page ? hv_vp_assist_page[smp_processor_id()] : NULL;
-	if (!hvp)
-		return;
 
 	/*
 	 * Process signal event direct set in the run page, if any.
