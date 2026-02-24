@@ -1809,8 +1809,8 @@ static int mshv_vtl_ioctl_return_to_lower_vtl(void)
 			if (ret)
 				return ret;
 			preempt_disable();
+			local_irq_save(irq_flags);
 		}
-
 
 		if (READ_ONCE(mshv_vtl_this_run()->cancel)) {
 			local_irq_restore(irq_flags);
