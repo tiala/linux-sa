@@ -27,7 +27,6 @@ use igvmfilegen_config::Image;
 use igvmfilegen_config::LinuxImage;
 use igvmfilegen_config::ResourceType;
 use igvmfilegen_config::Resources;
-use igvmfilegen_config::SecureAvicType;
 use igvmfilegen_config::SnpInjectionType;
 use igvmfilegen_config::UefiConfigType;
 use loader::importer::Aarch64Register;
@@ -184,7 +183,6 @@ fn create_igvm_file<R: IgvmfilegenRegister + GuestArch + 'static>(
                 policy,
                 enable_debug,
                 injection_type,
-                secure_avic,
             } => LoaderIsolationType::Snp {
                 shared_gpa_boundary_bits,
                 policy: SnpPolicy::from(policy).with_debug(enable_debug as u8),
@@ -193,10 +191,6 @@ fn create_igvm_file<R: IgvmfilegenRegister + GuestArch + 'static>(
                     SnpInjectionType::Restricted => {
                         vp_context_builder::snp::InjectionType::Restricted
                     }
-                },
-                secure_avic: match secure_avic {
-                    SecureAvicType::Enabled => vp_context_builder::snp::SecureAvic::Enabled,
-                    SecureAvicType::Disabled => vp_context_builder::snp::SecureAvic::Disabled,
                 },
             },
             ConfigIsolationType::Tdx {
