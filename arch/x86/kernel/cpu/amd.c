@@ -1365,6 +1365,8 @@ static __init int print_s5_reset_status_mmio(void)
 	u32 value;
 	int i;
 
+	return 0;
+
 	if (!cpu_feature_enabled(X86_FEATURE_ZEN))
 		return 0;
 

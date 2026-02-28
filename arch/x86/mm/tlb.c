@@ -1459,27 +1459,31 @@ void flush_tlb_mm_range(struct mm_struct *mm, unsigned long start,
 	info = get_flush_tlb_info(mm, start, end, stride_shift, freed_tables,
 				  new_tlb_gen);
 
+	
 	/*
 	 * flush_tlb_multi() is not optimized for the common case in which only
 	 * a local TLB flush is needed. Optimize this use-case by calling
 	 * flush_tlb_func_local() directly in this case.
 	 */
-	if (mm_global_asid(mm)) {
-		broadcast_tlb_flush(info);
-	} else if (cpumask_any_but(mm_cpumask(mm), cpu) < nr_cpu_ids) {
+//	if (mm_global_asid(mm)) {
+//		broadcast_tlb_flush(info);
+//	} else if (cpumask_any_but(mm_cpumask(mm), cpu) < nr_cpu_ids) {
 		info->trim_cpumask = should_trim_cpumask(mm);
 		flush_tlb_multi(mm_cpumask(mm), info);
 		consider_global_asid(mm);
-	} else if (mm == this_cpu_read(cpu_tlbstate.loaded_mm)) {
-		lockdep_assert_irqs_enabled();
-		local_irq_disable();
-		flush_tlb_func(info);
-		local_irq_enable();
-	}
-
+//	} else if (mm == this_cpu_read(cpu_tlbstate.loaded_mm)) {
+//		lockdep_assert_irqs_enabled();
+//		local_irq_disable();
+//		flush_tlb_func(info);
+//		local_irq_enable();
+//	}
+	
 	put_flush_tlb_info();
 	put_cpu();
-	mmu_notifier_arch_invalidate_secondary_tlbs(mm, start, end);
+
+	return;
+
+	//mmu_notifier_arch_invalidate_secondary_tlbs(mm, start, end);
 }
 
 static void do_flush_tlb_all(void *info)
@@ -1493,9 +1497,9 @@ void flush_tlb_all(void)
 	count_vm_tlb_event(NR_TLB_REMOTE_FLUSH);
 
 	/* First try (faster) hardware-assisted TLB invalidation. */
-	if (cpu_feature_enabled(X86_FEATURE_INVLPGB))
-		invlpgb_flush_all();
-	else
+//	if (cpu_feature_enabled(X86_FEATURE_INVLPGB))
+//		invlpgb_flush_all();
+//	else
 		/* Fall back to the IPI-based invalidation. */
 		on_each_cpu(do_flush_tlb_all, NULL, 1);
 }

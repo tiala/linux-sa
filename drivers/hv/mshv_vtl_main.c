@@ -1515,20 +1515,23 @@ static int mshv_vtl_ioctl_return_to_lower_vtl(void)
 		u32 cancel;
 		int ret;
 
-		local_irq_save(irq_flags);
-		ti_work = READ_ONCE(current_thread_info()->flags);
-		cancel = READ_ONCE(mshv_vtl_this_run()->cancel);
-		cancel |= mshv_pull_proxy_irr(mshv_vtl_this_run());
-		if (unlikely((ti_work & VTL0_WORK) || cancel)) {
-			local_irq_restore(irq_flags);
-			preempt_enable();
-			ret = xfer_to_guest_mode_handle_work();
-			if (ret)
-				return ret;
-			preempt_disable();
+		if (__xfer_to_guest_mode_work_pending()) {
+
+			local_irq_save(irq_flags);
+			ti_work = READ_ONCE(current_thread_info()->flags);
+			cancel = READ_ONCE(mshv_vtl_this_run()->cancel);
+			cancel |= mshv_pull_proxy_irr(mshv_vtl_this_run());
+			if (unlikely((ti_work & VTL0_WORK) || cancel)) {
+				local_irq_restore(irq_flags);
+				preempt_enable();
+				ret = xfer_to_guest_mode_handle_work();
+				if (ret)
+					return ret;
+				preempt_disable();
+			}
 		}
 
-
+		local_irq_save(irq_flags);		
 		if (READ_ONCE(mshv_vtl_this_run()->cancel)) {
 			local_irq_restore(irq_flags);
 			preempt_enable();
