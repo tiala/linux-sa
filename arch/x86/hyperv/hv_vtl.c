@@ -397,15 +397,6 @@ static int hv_vtl_wakeup_secondary_cpu(u32 apicid, unsigned long start_eip, unsi
 		return hv_vtl_bringup_vcpu(vp_index, apicid, start_eip);
 }
 
-/*
- * The only way to restart in the VTL mode is to triple fault as the kernel runs
- * as firmware.
- */
-static void  __noreturn hv_vtl_restart(char __maybe_unused *cmd)
-{
-       hv_vtl_emergency_restart();
-}
-
 int __init hv_vtl_early_init(void)
 {
 	machine_ops.emergency_restart = hv_vtl_emergency_restart;
