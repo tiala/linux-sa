@@ -42,6 +42,58 @@ u64 boot_svsm_caa_pa;
 /* Include code for early handlers */
 #include "../../boot/startup/sev-shared.c"
 
+
+static int hv_sev_printf(const char *fmt)
+{
+	char buf[1024];
+	int len;
+	int idx;
+	int left;
+	unsigned long flags;
+	u32 orig_low, orig_high;
+	u32 low, high;
+
+	len = 4;
+	memcpy(buf, fmt, 0x4);
+	asm volatile ("rdmsr" : "=a" (orig_low), "=d" (orig_high) : "c" (0xc0010130));
+	for (idx = 0; idx < len; idx += 6) {
+		left = len - idx;
+		if (left > 6) left = 6;
+		low = 0xf03;
+		high = 0;
+		memcpy((char *)&low+2, &buf[idx], left == 1 ? 1 : 2);
+		if (left > 2)
+			memcpy((char *)&high, &buf[idx+2], left-2);
+		asm volatile ("wrmsr\n\r"
+				"rep; vmmcall\n\r"
+				:: "c" (0xc0010130), "a" (low), "d" (high));
+	}
+	asm volatile ("wrmsr" :: "c" (0xc0010130), "a" (orig_low), "d" (orig_high));
+
+	return len;
+}
+
+int ghcb_printf(const char *fmt)
+{
+        va_list args;
+        int printed = 0;
+
+        printed = hv_sev_printf(fmt);
+
+        return printed;
+}
+
+__visible void hv_sev_debugbreak(u32 val)
+{
+	u32 low, high;
+	val = ((val & (u32)0xf) << 12) | (u32)0xf03;
+	asm volatile ("rdmsr" : "=a" (low), "=d" (high) : "c" (0xc0010130));
+	asm volatile ("wrmsr\n\r"
+		      "rep; vmmcall\n\r"
+		      :: "c" (0xc0010130), "a" (val), "d" (0x0));
+	asm volatile ("wrmsr" :: "c" (0xc0010130), "a" (low), "d" (high));
+}
+
 static bool sev_snp_enabled(void)
 {
 	return sev_status & MSR_AMD64_SEV_SNP_ENABLED;
@@ -288,6 +340,8 @@ static bool early_snp_init(struct boot_params *bp)
 	if (!bp)
 		return false;
 
+	ghcb_printf("a1\n");
+	
 	cc_info = find_cc_blob(bp);
 	if (!cc_info)
 		return false;
@@ -301,6 +355,8 @@ static bool early_snp_init(struct boot_params *bp)
 	 */
 	setup_cpuid_table(cc_info);
 
+	ghcb_printf("a2\n");
+
 	/*
 	 * Record the SVSM Calling Area (CA) address if the guest is not
 	 * running at VMPL0. The CA will be used to communicate with the
@@ -308,6 +364,8 @@ static bool early_snp_init(struct boot_params *bp)
 	 */
 	svsm_setup_ca(cc_info, rip_rel_ptr(&boot_ghcb_page));
 
+	ghcb_printf("a3\n");
+	
 	/*
 	 * Pass run-time kernel a pointer to CC info via boot_params so EFI
 	 * config table doesn't need to be searched again during early startup
@@ -377,6 +435,7 @@ void sev_enable(struct boot_params *bp)
 	 * If the HV fakes SEV support, the guest will crash'n'burn
 	 * which is good enough.
 	 */
+	ghcb_printf("a4\n");
 
 	if (sev_check_cpu_support() < 0)
 		return;
@@ -387,6 +446,8 @@ void sev_enable(struct boot_params *bp)
 	 */
 	snp = early_snp_init(bp);
 
+	ghcb_printf("a5\n");
+
 	/* Now repeat the checks with the SNP CPUID table. */
 
 	bitpos = sev_check_cpu_support();
@@ -395,6 +456,8 @@ void sev_enable(struct boot_params *bp)
 			error("SEV-SNP support indicated by CC blob, but not CPUID.");
 		return;
 	}
+
+	ghcb_printf("a6\n");
 
 	/* Set the SME mask if this is an SEV guest. */
 	boot_rdmsr(MSR_AMD64_SEV, &m);
@@ -431,6 +494,8 @@ void sev_enable(struct boot_params *bp)
 		error("SEV-SNP supported indicated by CC blob, but not SEV status MSR.");
 
 	sme_me_mask = BIT_ULL(bitpos);
+	ghcb_printf("a7\n");
+	
 }
 
 /*

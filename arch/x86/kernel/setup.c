@@ -879,6 +879,7 @@ static void __init x86_report_nx(void)
 
 void __init setup_arch(char **cmdline_p)
 {
+	printk("1234\n");
 #ifdef CONFIG_X86_32
 	memcpy(&boot_cpu_data, &new_cpu_data, sizeof(new_cpu_data));
 

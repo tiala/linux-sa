@@ -989,8 +989,8 @@ static int __init boot_cpus(char *str)
 		pr_warn("Invalid %s parameter\n", __func__);
 		goto ret;
 	}
-	cpu_boot_mask = mask;
-	mask = NULL;
+//	cpu_boot_mask = mask;
+//	mask = NULL;
 ret:
 	free_bootmem_cpumask_var(mask);
 	return 1;

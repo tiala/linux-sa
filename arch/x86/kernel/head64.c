@@ -314,10 +314,12 @@ void early_setup_idt(void)
 {
 	void *handler = NULL;
 
+	printk("b1\n");
 	if (IS_ENABLED(CONFIG_AMD_MEM_ENCRYPT)) {
 		setup_ghcb();
 		handler = vc_boot_ghcb;
 	}
+	printk("b2\n");
 
 	__pi_startup_64_load_idt(handler);
 }

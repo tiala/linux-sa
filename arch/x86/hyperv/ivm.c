@@ -886,16 +886,9 @@ static bool hv_is_private_mmio(u64 addr)
 	return false;
 }
 
-static __init void hv_snp_get_smp_config(unsigned int early)
+static __init void hv_snp_get_smp_config(void)
 {
-	/*
-	 * The "early" is only to be true when there is AMD
-	 * numa support. Hyper-V AMD SEV-SNP guest may not
-	 * have numa support. To make sure smp config is
-	 * always initialized, do that when early is false.
-	 */
-	if (early)
-		return;
+	u32 num_processors;
 
 	/*
 	 * There is no firmware and ACPI MADT table support in
@@ -904,8 +897,8 @@ static __init void hv_snp_get_smp_config(unsigned int early)
 	 */
 	while (num_processors < processor_count) {
 		early_per_cpu(x86_cpu_to_apicid, num_processors) = num_processors;
-		early_per_cpu(x86_bios_cpu_apicid, num_processors) = num_processors;
-		physid_set(num_processors, phys_cpu_present_map);
+		//early_per_cpu(x86_bios_cpu_apicid, num_processors) = num_processors;
+		set_bit(num_processors, phys_cpu_present_map);
 		set_cpu_possible(num_processors, true);
 		set_cpu_present(num_processors, true);
 		num_processors++;
@@ -932,8 +925,9 @@ __init void hv_sev_init_mem_and_cpu(void)
 	x86_platform.get_wallclock		= get_rtc_noop;
 	x86_init.resources.probe_roms		= x86_init_noop;
 	x86_init.resources.reserve_resources	= x86_init_noop;
-	x86_init.mpparse.find_smp_config	= x86_init_noop;
-	x86_init.mpparse.get_smp_config		= hv_snp_get_smp_config;
+	x86_init.mpparse.find_mptable	= x86_init_noop;
+	x86_init.mpparse.early_parse_smp_cfg	= x86_init_noop;
+	x86_init.mpparse.parse_smp_cfg		= hv_snp_get_smp_config;
 
 	/*
 	 * Hyper-V SEV-SNP enlightened guest doesn't support ioapic
