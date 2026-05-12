@@ -247,7 +247,8 @@ extern void __init x2apic_set_max_apicid(u32 apicid);
 extern void x2apic_setup(void);
 static inline int x2apic_enabled(void)
 {
-	return boot_cpu_has(X86_FEATURE_X2APIC) && apic_is_x2apic_enabled();
+	return 1;
+//	return boot_cpu_has(X86_FEATURE_X2APIC) && apic_is_x2apic_enabled();
 }
 
 #define x2apic_supported()	(boot_cpu_has(X86_FEATURE_X2APIC))
