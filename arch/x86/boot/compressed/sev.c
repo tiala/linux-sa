@@ -254,7 +254,8 @@ bool sev_es_check_ghcb_fault(unsigned long address)
  */
 #define SNP_FEATURES_PRESENT	(MSR_AMD64_SNP_DEBUG_SWAP |	\
 				 MSR_AMD64_SNP_SECURE_TSC |	\
-				 SNP_FEATURE_SECURE_AVIC)
+				 SNP_FEATURE_SECURE_AVIC  |	\
+				 MSR_AMD64_SNP_RESTRICTED_INJ)
 
 u64 snp_get_unsupported_features(u64 status)
 {
