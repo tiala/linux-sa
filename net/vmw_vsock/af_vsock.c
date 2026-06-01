@@ -2294,19 +2294,20 @@ static int __vsock_stream_recvmsg(struct sock *sk, struct msghdr *msg,
 	if (err < 0)
 		goto out;
 
-
 	while (1) {
 		ssize_t read;
 
 		err = vsock_connectible_wait_data(sk, &wait, timeout,
 						  &recv_data, target);
-		if (err <= 0)
+		if (err <= 0) {
 			break;
+		}
 
 		err = transport->notify_recv_pre_dequeue(vsk, target,
 							 &recv_data);
-		if (err < 0)
+		if (err < 0) {
 			break;
+		}
 
 		read = transport->stream_dequeue(vsk, msg, len - copied, flags);
 		if (read < 0) {
@@ -2318,8 +2319,9 @@ static int __vsock_stream_recvmsg(struct sock *sk, struct msghdr *msg,
 
 		err = transport->notify_recv_post_dequeue(vsk, target, read,
 						!(flags & MSG_PEEK), &recv_data);
-		if (err < 0)
+		if (err < 0) {
 			goto out;
+		}
 
 		if (read >= target || flags & MSG_PEEK)
 			break;
@@ -2400,8 +2402,9 @@ __vsock_connectible_recvmsg(struct socket *sock, struct msghdr *msg, size_t len,
 
 	sk = sock->sk;
 
-	if (unlikely(flags & MSG_ERRQUEUE))
+	if (unlikely(flags & MSG_ERRQUEUE)) {
 		return sock_recv_errqueue(sk, msg, len, SOL_VSOCK, VSOCK_RECVERR);
+	}
 
 	vsk = vsock_sk(sk);
 	err = 0;
@@ -2446,10 +2449,14 @@ __vsock_connectible_recvmsg(struct socket *sock, struct msghdr *msg, size_t len,
 		goto out;
 	}
 
-	if (sk->sk_type == SOCK_STREAM)
+	if (sk->sk_type == SOCK_STREAM) {
 		err = __vsock_stream_recvmsg(sk, msg, len, flags);
-	else
+		pr_info("%s %d err %d.\n", __func__, __LINE__, err);
+		//err = 0;
+	} else {
 		err = __vsock_seqpacket_recvmsg(sk, msg, len, flags);
+		pr_info("%s %d err %d.\n", __func__, __LINE__, err);
+	}
 
 out:
 	release_sock(sk);

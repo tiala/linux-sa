@@ -549,7 +549,6 @@ static void hvs_destruct(struct vsock_sock *vsk)
 		vmbus_hvsock_device_unregister(chan);
 
 	kfree(hvs);
-	vsk->trans = NULL;
 }
 
 static int hvs_dgram_bind(struct vsock_sock *vsk, struct sockaddr_vm *addr)
@@ -589,8 +588,10 @@ static int hvs_update_recv_data(struct hvsock *hvs)
 	payload_len = recv_buf->hdr.data_size;
 
 	if (payload_len > pkt_len - HVS_HEADER_LEN ||
-	    payload_len > HVS_MTU_SIZE)
+	    payload_len > HVS_MTU_SIZE) {
+		//pr_info("%s %d\n", __func__, __LINE__);		
 		return -EIO;
+	}
 
 	if (payload_len == 0)
 		hvs->vsk->peer_shutdown |= SEND_SHUTDOWN;
@@ -698,22 +699,28 @@ static s64 hvs_stream_has_data(struct vsock_sock *vsk)
 	s64 ret;
 
 	if (hvs->recv_data_len > 0)
-		return hvs->recv_data_len;
+		return 1;
 
 	switch (hvs_channel_readable_payload(hvs->chan)) {
 	case 1:
-		need_refill = !hvs->recv_desc;
-		if (!need_refill)
-			return -EIO;
-
-		hvs->recv_desc = hv_pkt_iter_first(hvs->chan);
-		if (!hvs->recv_desc)
-			return -ENOBUFS;
-
-		ret = hvs_update_recv_data(hvs);
-		if (ret)
-			return ret;
-		return hvs->recv_data_len;
+//		need_refill = !hvs->recv_desc;
+//		if (hvs->recv_desc) {
+//			pr_info("%s %d.\n", __func__, __LINE__);
+//			if (!(hvs->vsk->peer_shutdown & SEND_SHUTDOWN))
+//				return -EIO;
+//
+//			return 0;
+//		}
+//
+//		hvs->recv_desc = hv_pkt_iter_first(hvs->chan);
+//		if (!hvs->recv_desc)
+//			return -ENOBUFS;
+//
+//		ret = hvs_update_recv_data(hvs);
+//		if (ret)
+//			return ret;
+		ret = 1;
+		break;
 	case 0:
 		vsk->peer_shutdown |= SEND_SHUTDOWN;
 		ret = 0;

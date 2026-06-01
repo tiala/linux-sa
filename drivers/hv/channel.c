@@ -124,26 +124,29 @@ static inline u64 hv_gpadl_hvpfn(enum hv_gpadl_type type, void *kbuffer,
 void vmbus_setevent(struct vmbus_channel *channel)
 {
 	struct hv_monitor_page *monitorpage;
+	//const guid_t guid = HV_NIC_GUID;
 
 	trace_vmbus_setevent(channel);
 
+	//HV_NIC_GUID	
 	/*
 	 * For channels marked as in "low latency" mode
 	 * bypass the monitor page mechanism.
 	 */
-	if (channel->offermsg.monitor_allocated && !channel->low_latency) {
-		vmbus_send_interrupt(channel->offermsg.child_relid);
-
-		/* Get the child to parent monitor page */
-		monitorpage = vmbus_connection.monitor_pages[1];
-
-		sync_set_bit(channel->monitor_bit,
-			(unsigned long *)&monitorpage->trigger_group
-					[channel->monitor_grp].pending);
-
-	} else {
+	//if ((guid_equal(&channel->offermsg.offer.if_type, &guid)
+	//    || (channel->offermsg.monitor_allocated && !channel->low_latency)) {
+	//	vmbus_send_interrupt(channel->offermsg.child_relid);
+	//
+	//	/* Get the child to parent monitor page */
+	//	monitorpage = vmbus_connection.monitor_pages[1];
+	//
+	//	sync_set_bit(channel->monitor_bit,
+	//		(unsigned long *)&monitorpage->trigger_group
+	//				[channel->monitor_grp].pending);
+	//
+	//} else {
 		vmbus_set_event(channel);
-	}
+	//}
 }
 EXPORT_SYMBOL_GPL(vmbus_setevent);
 
@@ -792,13 +795,17 @@ int vmbus_open(struct vmbus_channel *newchannel,
 
 	err = vmbus_alloc_ring(newchannel, send_ringbuffer_size,
 			       recv_ringbuffer_size);
-	if (err)
+	if (err) {
+		pr_info("%s %d.\n", __func__, __LINE__);
 		return err;
+	}
 
 	err = __vmbus_open(newchannel, userdata, userdatalen,
 			   onchannelcallback, context);
-	if (err)
+	if (err) {
+		pr_info("%s %d.\n", __func__, __LINE__);
 		vmbus_free_ring(newchannel);
+	}
 
 	return err;
 }

@@ -218,6 +218,7 @@ static int hv_setup_stimer0_irq(void)
 {
 	int ret;
 
+	pr_info("%s %d.\n", __func__, __LINE__);
 	ret = acpi_register_gsi(NULL, HYPERV_STIMER0_VECTOR,
 			ACPI_EDGE_SENSITIVE, ACPI_ACTIVE_HIGH);
 	if (ret < 0) {
@@ -226,6 +227,7 @@ static int hv_setup_stimer0_irq(void)
 	}
 	stimer0_irq = ret;
 
+	pr_info("%s %d.\n", __func__, __LINE__);	
 	ret = request_percpu_irq(stimer0_irq, hv_stimer0_percpu_isr,
 		"Hyper-V stimer0", &stimer0_evt);
 	if (ret) {
@@ -234,6 +236,8 @@ static int hv_setup_stimer0_irq(void)
 		acpi_unregister_gsi(stimer0_irq);
 		stimer0_irq = -1;
 	}
+
+	pr_info("%s %d.\n", __func__, __LINE__);
 	return ret;
 }
 
@@ -275,15 +279,16 @@ int hv_stimer_alloc(bool have_percpu_irqs)
 	if (!hv_clock_event)
 		return -ENOMEM;
 
-	pr_info("%s %d.\n", __func__, __LINE__);
 	direct_mode_enabled = ms_hyperv.misc_features &
 			HV_STIMER_DIRECT_MODE_AVAILABLE;
+	pr_info("%s %d direct %d.\n", __func__, __LINE__, direct_mode_enabled);
 
+	
 	/*
 	 * If Direct Mode isn't enabled, the remainder of the initialization
 	 * is done later by hv_stimer_legacy_init()
 	 */
-	//if (!direct_mode_enabled)
+	if (!direct_mode_enabled)
 		return 0;
 
 	if (have_percpu_irqs) {

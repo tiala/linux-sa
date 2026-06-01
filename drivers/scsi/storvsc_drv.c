@@ -364,9 +364,9 @@ MODULE_PARM_DESC(ring_avail_percent_lowater,
  */
 static const int storvsc_timeout = 180;
 
-#if IS_ENABLED(CONFIG_SCSI_FC_ATTRS)
-static struct scsi_transport_template *fc_transport_template;
-#endif
+//#if IS_ENABLED(CONFIG_SCSI_FC_ATTRS)
+//static struct scsi_transport_template *fc_transport_template;
+//#endif
 
 static struct scsi_host_template scsi_driver;
 static void storvsc_on_channel_callback(void *context);
@@ -452,9 +452,9 @@ struct storvsc_device {
 	 */
 	u64 node_name;
 	u64 port_name;
-#if IS_ENABLED(CONFIG_SCSI_FC_ATTRS)
-	struct fc_rport *rport;
-#endif
+//#if IS_ENABLED(CONFIG_SCSI_FC_ATTRS)
+//	struct fc_rport *rport;
+//#endif
 };
 
 struct hv_host_device {
@@ -807,6 +807,7 @@ static void cache_wwn(struct storvsc_device *stor_device,
 	}
 }
 
+bool init_request;
 
 static int storvsc_execute_vstor_op(struct hv_device *device,
 				    struct storvsc_cmd_request *request,
@@ -825,6 +826,8 @@ static int storvsc_execute_vstor_op(struct hv_device *device,
 	init_completion(&request->wait_event);
 	vstor_packet->flags = REQUEST_COMPLETION_FLAG;
 
+	//init_request = true;
+	
 	ret = vmbus_sendpacket(device->channel, vstor_packet,
 			       sizeof(struct vstor_packet),
 			       VMBUS_RQST_INIT,
@@ -839,7 +842,7 @@ static int storvsc_execute_vstor_op(struct hv_device *device,
 
 	if (!status_check)
 		return ret;
-
+	
 	if (vstor_packet->operation != VSTOR_OPERATION_COMPLETE_IO ||
 	    vstor_packet->status != 0)
 		return -EINVAL;
@@ -897,7 +900,6 @@ static int storvsc_channel_init(struct hv_device *device, bool is_fc)
 
 		if (vstor_packet->status == 0) {
 			vmstor_proto_version = protocol_version[i];
-
 			break;
 		}
 	}
@@ -1226,10 +1228,10 @@ static void storvsc_on_receive(struct storvsc_device *stor_device,
 
 	case VSTOR_OPERATION_FCHBA_DATA:
 		cache_wwn(stor_device, vstor_packet);
-#if IS_ENABLED(CONFIG_SCSI_FC_ATTRS)
-		fc_host_node_name(stor_device->host) = stor_device->node_name;
-		fc_host_port_name(stor_device->host) = stor_device->port_name;
-#endif
+//#if IS_ENABLED(CONFIG_SCSI_FC_ATTRS)
+//		fc_host_node_name(stor_device->host) = stor_device->node_name;
+//		fc_host_port_name(stor_device->host) = stor_device->port_name;
+//#endif
 		break;
 	default:
 		break;
@@ -1245,6 +1247,7 @@ static void storvsc_on_channel_callback(void *context)
 	struct Scsi_Host *shost;
 	unsigned long time_limit = jiffies + msecs_to_jiffies(CALLBACK_TIMEOUT);
 
+
 	if (channel->primary_channel != NULL)
 		device = channel->primary_channel->device_obj;
 	else
@@ -1253,7 +1256,7 @@ static void storvsc_on_channel_callback(void *context)
 	stor_device = get_in_stor_device(device);
 	if (!stor_device)
 		return;
-
+		
 	shost = stor_device->host;
 
 	foreach_vmbus_pkt(desc, channel) {
@@ -1275,6 +1278,11 @@ static void storvsc_on_channel_callback(void *context)
 				rqst_id, pktlen, minlen);
 			continue;
 		}
+
+		//if (init_request) {
+		//	rqst_id = VMBUS_RQST_INIT;
+		//	init_request = false;
+		//}
 
 		if (rqst_id == VMBUS_RQST_INIT) {
 			request = &stor_device->init_request;
@@ -1350,6 +1358,7 @@ static int storvsc_connect_to_vsp(struct hv_device *device, u32 ring_size,
 		return ret;
 
 	ret = storvsc_channel_init(device, is_fc);
+
 	if (ret)
 		vmbus_close(device->channel);
 
@@ -1995,9 +2004,9 @@ static int storvsc_probe(struct hv_device *device,
 		host->max_lun = STORVSC_FC_MAX_LUNS_PER_TARGET;
 		host->max_id = STORVSC_FC_MAX_TARGETS;
 		host->max_channel = STORVSC_FC_MAX_CHANNELS - 1;
-#if IS_ENABLED(CONFIG_SCSI_FC_ATTRS)
-		host->transportt = fc_transport_template;
-#endif
+//#if IS_ENABLED(CONFIG_SCSI_FC_ATTRS)
+//		host->transportt = fc_transport_template;
+//#endif
 		break;
 
 	case SCSI_GUID:
@@ -2066,12 +2075,17 @@ static int storvsc_probe(struct hv_device *device,
 		ret = -ENOMEM;
 		goto err_out2;
 	}
+	
 	INIT_WORK(&host_dev->host_scan_work, storvsc_host_scan);
+	
 	/* Register the HBA and start the scsi bus scan */
 	ret = scsi_add_host(host, &device->device);
 	if (ret != 0)
 		goto err_out3;
 
+	pr_info("%s %d.\n", __func__, __LINE__);
+	
+	
 	if (!dev_is_ide) {
 		scsi_scan_host(host);
 	} else {
@@ -2081,21 +2095,24 @@ static int storvsc_probe(struct hv_device *device,
 		if (ret)
 			goto err_out4;
 	}
-#if IS_ENABLED(CONFIG_SCSI_FC_ATTRS)
-	if (host->transportt == fc_transport_template) {
-		struct fc_rport_identifiers ids = {
-			.roles = FC_PORT_ROLE_FCP_DUMMY_INITIATOR,
-		};
 
-		fc_host_node_name(host) = stor_device->node_name;
-		fc_host_port_name(host) = stor_device->port_name;
-		stor_device->rport = fc_remote_port_add(host, 0, &ids);
-		if (!stor_device->rport) {
-			ret = -ENOMEM;
-			goto err_out4;
-		}
-	}
-#endif
+	
+//#if IS_ENABLED(CONFIG_SCSI_FC_ATTRS)
+//	if (host->transportt == fc_transport_template) {
+//		struct fc_rport_identifiers ids = {
+//			.roles = FC_PORT_ROLE_FCP_DUMMY_INITIATOR,
+//		};
+//
+//		fc_host_node_name(host) = stor_device->node_name;
+//		fc_host_port_name(host) = stor_device->port_name;
+//		stor_device->rport = fc_remote_port_add(host, 0, &ids);
+//		if (!stor_device->rport) {
+//			ret = -ENOMEM;
+//			goto err_out4;
+//		}
+//	}
+//
+//#endif
 	return 0;
 
 err_out4:
@@ -2138,12 +2155,12 @@ static void storvsc_remove(struct hv_device *dev)
 	struct Scsi_Host *host = stor_device->host;
 	struct hv_host_device *host_dev = shost_priv(host);
 
-#if IS_ENABLED(CONFIG_SCSI_FC_ATTRS)
-	if (host->transportt == fc_transport_template) {
-		fc_remote_port_delete(stor_device->rport);
-		fc_remove_host(host);
-	}
-#endif
+//#if IS_ENABLED(CONFIG_SCSI_FC_ATTRS)
+//	if (host->transportt == fc_transport_template) {
+//		fc_remote_port_delete(stor_device->rport);
+//		fc_remove_host(host);
+//	}
+//#endif
 	destroy_workqueue(host_dev->handle_error_wq);
 	scsi_remove_host(host);
 	storvsc_dev_remove(dev);
@@ -2191,12 +2208,12 @@ static struct hv_driver storvsc_drv = {
 	},
 };
 
-#if IS_ENABLED(CONFIG_SCSI_FC_ATTRS)
-static struct fc_function_template fc_transport_functions = {
-	.show_host_node_name = 1,
-	.show_host_port_name = 1,
-};
-#endif
+//#if IS_ENABLED(CONFIG_SCSI_FC_ATTRS)
+//static struct fc_function_template fc_transport_functions = {
+//	.show_host_node_name = 1,
+//	.show_host_port_name = 1,
+//};
+//#endif
 
 static int __init storvsc_drv_init(void)
 {
@@ -2215,18 +2232,18 @@ static int __init storvsc_drv_init(void)
 		sizeof(struct vstor_packet) + sizeof(u64),
 		sizeof(u64)));
 
-#if IS_ENABLED(CONFIG_SCSI_FC_ATTRS)
-	fc_transport_template = fc_attach_transport(&fc_transport_functions);
-	if (!fc_transport_template)
-		return -ENODEV;
-#endif
+//#if IS_ENABLED(CONFIG_SCSI_FC_ATTRS)
+//	fc_transport_template = fc_attach_transport(&fc_transport_functions);
+//	if (!fc_transport_template)
+//		return -ENODEV;
+//#endif
 
 	ret = vmbus_driver_register(&storvsc_drv);
 
-#if IS_ENABLED(CONFIG_SCSI_FC_ATTRS)
-	if (ret)
-		fc_release_transport(fc_transport_template);
-#endif
+//#if IS_ENABLED(CONFIG_SCSI_FC_ATTRS)
+//	if (ret)
+//		fc_release_transport(fc_transport_template);
+//#endif
 
 	return ret;
 }
@@ -2234,9 +2251,9 @@ static int __init storvsc_drv_init(void)
 static void __exit storvsc_drv_exit(void)
 {
 	vmbus_driver_unregister(&storvsc_drv);
-#if IS_ENABLED(CONFIG_SCSI_FC_ATTRS)
-	fc_release_transport(fc_transport_template);
-#endif
+//#if IS_ENABLED(CONFIG_SCSI_FC_ATTRS)
+//	fc_release_transport(fc_transport_template);
+//#endif
 }
 
 MODULE_LICENSE("GPL");

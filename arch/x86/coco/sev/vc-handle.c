@@ -1284,7 +1284,6 @@ void do_exc_hv(struct pt_regs *regs)
 			&sev_snp_current_doorbell_page()->pending_events.events,
 			0);
 
-		pr_info("%s %d vector %x.\n", __func__, __LINE__, pending_events.vector);
 		if (pending_events.nmi)
 			exc_nmi(regs);
 
@@ -1296,7 +1295,6 @@ void do_exc_hv(struct pt_regs *regs)
 		if (!pending_events.vector)
 			goto out;
 
-		pr_info("%s %d\n", __func__, __LINE__);
 		if (pending_events.vector < FIRST_EXTERNAL_VECTOR) {
 			/* Exception vectors */
 			WARN(1, "exception shouldn't happen\n");
@@ -1306,14 +1304,14 @@ void do_exc_hv(struct pt_regs *regs)
 			WARN(1, "syscall shouldn't happen\n");
 		} else if (pending_events.vector >= FIRST_SYSTEM_VECTOR) {
 			switch (pending_events.vector) {
-#if IS_ENABLED(CONFIG_HYPERV)
+		//#if IS_ENABLED(CONFIG_HYPERV)
 			case HYPERV_STIMER0_VECTOR:
 				sysvec_hyperv_stimer0(regs);
 				break;
 			case HYPERVISOR_CALLBACK_VECTOR:
 				sysvec_hyperv_callback(regs);
 				break;
-#endif
+		//#endif
 #ifdef CONFIG_SMP
 			case RESCHEDULE_VECTOR:
 				sysvec_reschedule_ipi(regs);

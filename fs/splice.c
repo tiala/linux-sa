@@ -336,8 +336,9 @@ ssize_t copy_splice_read(struct file *in, loff_t *ppos,
 
 	bv = kzalloc(array_size(npages, sizeof(bv[0])) +
 		     array_size(npages, sizeof(struct page *)), GFP_KERNEL);
-	if (!bv)
+	if (!bv) {
 		return -ENOMEM;
+	}
 
 	pages = (struct page **)(bv + npages);
 	npages = alloc_pages_bulk(GFP_USER, npages, pages);
@@ -371,8 +372,9 @@ ssize_t copy_splice_read(struct file *in, loff_t *ppos,
 	 * Callers of ->splice_read() expect -EAGAIN on "can't put anything in
 	 * there", rather than -EFAULT.
 	 */
-	if (ret == -EFAULT)
+	if (ret == -EFAULT) {
 		ret = -EAGAIN;
+	}
 
 	/* Free any pages that didn't get touched at all. */
 	if (keep < npages)

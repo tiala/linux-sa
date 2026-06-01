@@ -1074,15 +1074,15 @@ void __init native_smp_prepare_cpus(unsigned int max_cpus)
 	pr_info("%s %d\n", __func__, __LINE__);
 
 	pr_info("CPU0: ");
-//	print_cpu_info(&cpu_data(0));
-//
-//	uv_system_init();
-//
-//	smp_set_init_udelay();
-//
-//	speculative_store_bypass_ht_init();
-//
-//	snp_set_wakeup_secondary_cpu();
+	print_cpu_info(&cpu_data(0));
+
+	uv_system_init();
+
+	smp_set_init_udelay();
+
+	speculative_store_bypass_ht_init();
+
+	snp_set_wakeup_secondary_cpu();
 }
 
 void arch_thaw_secondary_cpus_begin(void)
